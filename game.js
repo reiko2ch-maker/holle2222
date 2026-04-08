@@ -6,7 +6,6 @@ if (typeof THREE === 'undefined') {
 }
 
 const SAVE_PREFIX = 'yoiyado_b1_smartphone_slot_';
-const PATCH_VERSION = '3dplus_2p5d_patch1';
 const TAU = Math.PI * 2;
 
 const canvas = document.getElementById('game-canvas');
@@ -116,15 +115,14 @@ const graph = {
   corridor: { lobby: 12, room201: 6, room202: 7, bath: 12, north: 13 },
   room201: { corridor: 6 },
   room202: { corridor: 7 },
-  bath: { corridor: 12, toilet: 7 },
-  toilet: { corridor: 8, bath: 7 },
+  bath: { corridor: 12 },
   archive: { lobby: 9, detached: 14 },
   north: { corridor: 13, detached: 8 },
   detached: { north: 8, archive: 14 }
 };
 
 const areaLabels = {
-  home: '自宅', town: '田舎町', lobby: '帳場', kitchen: '厨房', corridor: '客室廊下', room201: '201号室', room202: '202号室', bath: '浴場前', toilet: '共同トイレ', archive: '宿帳庫', north: '北廊下', detached: '離れ通路'
+  home: '自宅', town: '田舎町', lobby: '帳場', kitchen: '厨房', corridor: '客室廊下', room201: '201号室', room202: '202号室', bath: '浴場前', archive: '宿帳庫', north: '北廊下', detached: '離れ通路'
 };
 
 const stepDefs = {
@@ -269,23 +267,6 @@ const storyNodes = {
 続きは、明日の夜に。`, 'okami']
   ]
 };
-storyNodes.toiletPeek = [
-  ['主人公', `個室の奥に、人影。
-しゃがんだままこちらを見ている。`, 'hero'],
-  ['主人公', `壁一面に同じ顔の張り紙が貼られている。
-……誰かが、ここで集めている。`, 'hero']
-];
-
-const portraitImages = {
-  okami: 'assets/characters/portrait_serious.png',
-  maid: 'assets/characters/portrait_smile.png',
-  guest: 'assets/characters/portrait_smile.png',
-  guide: 'assets/characters/portrait_serious.png',
-  chef: 'assets/characters/portrait_smile.png',
-  villager: 'assets/characters/portrait_smile.png',
-  hero: 'assets/characters/portrait_serious.png',
-  phone: null
-};
 
 const faceTextures = {
   okami: makeFaceTexture('#f0d7c6', '#201515', '#7b2932', 'okami'),
@@ -374,17 +355,6 @@ const realismAssets = {
   forbidden: loadAssetTexture('assets/forbidden_room.jpg'),
   exterior: loadAssetTexture('assets/ryokan_exterior_night.jpg')
 };
-const posterAssets = {
-  wanted: loadAssetTexture('assets/posters/wanted.jpg'),
-  missing: loadAssetTexture('assets/posters/missing.jpg')
-};
-const characterSheetAssets = {
-  villager: { front: loadAssetTexture('assets/characters/villager_front.png'), side: loadAssetTexture('assets/characters/villager_side.png'), w: 1.12, h: 1.96 },
-  okami: { front: loadAssetTexture('assets/characters/okami_front.png'), side: loadAssetTexture('assets/characters/okami_side.png'), w: 1.08, h: 1.92 },
-  maid: { front: loadAssetTexture('assets/characters/maid_front.png'), side: null, w: 1.08, h: 1.92 },
-  guide: { front: loadAssetTexture('assets/characters/guide_front.png'), side: loadAssetTexture('assets/characters/guide_side.png'), w: 1.08, h: 1.96 },
-  crouch: { front: loadAssetTexture('assets/characters/crouch_raw.jpg'), side: null, w: 1.42, h: 1.18, yOffset: 0.1 }
-};
 function addBackdropPlane(tex, x, y, z, w, h, ry=0, opacity=0.92){
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: opacity < 1, opacity });
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
@@ -392,60 +362,6 @@ function addBackdropPlane(tex, x, y, z, w, h, ry=0, opacity=0.92){
   plane.rotation.y = ry;
   areaGroup.add(plane);
   return plane;
-}
-
-function addPoster(kind, x, y, z, w, h, ry=0){
-  const tex = posterAssets[kind] || posterAssets.wanted;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.02 });
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-  plane.position.set(x, y, z);
-  plane.rotation.y = ry;
-  areaGroup.add(plane);
-  return plane;
-}
-function characterAssetForType(type){
-  if (type === 'okami') return 'okami';
-  if (type === 'maid') return 'maid';
-  if (type === 'guide') return 'guide';
-  if (type === 'guest' || type === 'villager' || type === 'chef') return 'villager';
-  if (type === 'crouch') return 'crouch';
-  return 'villager';
-}
-function makeBillboardCharacter(type){
-  const key = characterAssetForType(type);
-  const data = characterSheetAssets[key];
-  const g = new THREE.Group();
-  const frontMat = new THREE.MeshBasicMaterial({ map: data.front, transparent: true, alphaTest: 0.08, side: THREE.DoubleSide });
-  const sideMat = data.side ? new THREE.MeshBasicMaterial({ map: data.side, transparent: true, alphaTest: 0.08, side: THREE.DoubleSide }) : null;
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(data.w, data.h), frontMat);
-  plane.position.y = data.h * 0.5 + (data.yOffset || 0);
-  plane.renderOrder = 2;
-  plane.userData.billboard = { frontMat, sideMat, baseWidth: data.w };
-  g.add(plane);
-  const shadow = new THREE.Mesh(new THREE.CircleGeometry(key === 'crouch' ? 0.5 : 0.34, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: key === 'crouch' ? 0.24 : 0.18 }));
-  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.01; shadow.scale.set(1.1, 0.76, 1); g.add(shadow);
-  g.userData.billboardPlane = plane;
-  g.userData.billboardType = key;
-  return g;
-}
-function updateImageBillboard(group, forwardRot){
-  if (!group || !group.userData.billboardPlane) return;
-  const plane = group.userData.billboardPlane;
-  const dx = camera.position.x - group.position.x;
-  const dz = camera.position.z - group.position.z;
-  const faceYaw = Math.atan2(dx, dz);
-  group.rotation.y = faceYaw;
-  const info = plane.userData.billboard;
-  if (!info) return;
-  if (!info.sideMat) { plane.material = info.frontMat; plane.scale.x = 1; return; }
-  const rel = Math.atan2(Math.sin(faceYaw - (forwardRot || 0)), Math.cos(faceYaw - (forwardRot || 0)));
-  if (Math.abs(rel) > Math.PI * 0.28 && Math.abs(rel) < Math.PI * 0.72) {
-    plane.material = info.sideMat;
-    plane.scale.x = rel > 0 ? -1 : 1;
-  } else {
-    plane.material = info.frontMat;
-    plane.scale.x = Math.abs(rel) > Math.PI * 0.72 ? -1 : 1;
-  }
 }
 
 
@@ -609,12 +525,73 @@ function archiveShelves(){
 }
 
 function makeCharacter(type, costume){
-  return makeBillboardCharacter(type);
+  const g = new THREE.Group();
+  const skin = new THREE.MeshStandardMaterial({ color: 0xe7cbb8, roughness: 0.68, metalness: 0.02 });
+  const clothing = new THREE.MeshStandardMaterial({ color: costume || 0x374c7a, roughness: 0.86, metalness: 0.01 });
+  const clothingDark = new THREE.MeshStandardMaterial({ color: 0x262a31, roughness: 0.9 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: 0x171819, roughness: 0.92 });
+  const shoeMat = new THREE.MeshStandardMaterial({ color: 0x0d0f16, roughness: 0.82 });
+
+  const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.24,0.24), clothing);
+  pelvis.position.y = 0.74;
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.22,0.58,6,10), clothing);
+  torso.position.y = 1.18; torso.scale.z = 0.9;
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.085,0.12,12), skin); neck.position.y = 1.62;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 26, 22), skin); head.position.y = 1.88; head.scale.set(0.96,1.08,0.96);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.028,0.1,10), skin); nose.position.set(0,1.86,0.19); nose.rotation.x = Math.PI/2;
+  const browL = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.018,0.02), hairMat); browL.position.set(-0.055,1.93,0.185); browL.rotation.z = -0.08;
+  const browR = browL.clone(); browR.position.x = 0.055; browR.rotation.z = 0.08;
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.018,8,8), new THREE.MeshBasicMaterial({ color: 0x1a1a1a })); eyeL.position.set(-0.055,1.87,0.196); eyeL.scale.z = 0.4;
+  const eyeR = eyeL.clone(); eyeR.position.x = 0.055;
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.012,0.02), new THREE.MeshBasicMaterial({ color: type === 'guide' ? 0x866868 : 0x8c5d56 })); mouth.position.set(0,1.78,0.19);
+  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.225,22,18,0,Math.PI*2,0,Math.PI/2), hairMat); hairCap.position.set(0,1.96,-0.01); hairCap.scale.set(1.04,0.9,1.05);
+  const hairBack = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.28,0.16), hairMat); hairBack.position.set(0,1.88,-0.11);
+
+  const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.095,12,12), clothing); shoulderL.position.set(-0.28,1.4,0);
+  const shoulderR = shoulderL.clone(); shoulderR.position.x = 0.28;
+  const upperArmL = new THREE.Mesh(new THREE.CapsuleGeometry(0.07,0.34,5,10), clothing); upperArmL.position.set(-0.36,1.12,0); upperArmL.rotation.z = 0.14;
+  const upperArmR = upperArmL.clone(); upperArmR.position.x = 0.36; upperArmR.rotation.z = -0.14;
+  const foreArmL = new THREE.Mesh(new THREE.CapsuleGeometry(0.058,0.28,5,10), clothingDark); foreArmL.position.set(-0.4,0.84,0.01); foreArmL.rotation.z = 0.09;
+  const foreArmR = foreArmL.clone(); foreArmR.position.x = 0.4; foreArmR.rotation.z = -0.09;
+  const handL = new THREE.Mesh(new THREE.SphereGeometry(0.06,12,12), skin); handL.position.set(-0.43,0.61,0.02);
+  const handR = handL.clone(); handR.position.x = 0.43;
+
+  const thighL = new THREE.Mesh(new THREE.CapsuleGeometry(0.085,0.34,5,10), clothingDark); thighL.position.set(-0.12,0.35,0.01);
+  const thighR = thighL.clone(); thighR.position.x = 0.12;
+  const calfL = new THREE.Mesh(new THREE.CapsuleGeometry(0.07,0.34,5,10), clothingDark); calfL.position.set(-0.12,-0.02,0.01);
+  const calfR = calfL.clone(); calfR.position.x = 0.12;
+  const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.1,0.36), shoeMat); shoeL.position.set(-0.12,-0.29,0.05);
+  const shoeR = shoeL.clone(); shoeR.position.x = 0.12;
+
+  g.add(pelvis, torso, neck, head, nose, browL, browR, eyeL, eyeR, mouth, hairCap, hairBack, shoulderL, shoulderR, upperArmL, upperArmR, foreArmL, foreArmR, handL, handR, thighL, thighR, calfL, calfR, shoeL, shoeR);
+
+  if (type === 'okami') {
+    const kimono = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.34,1.34,22,1), new THREE.MeshStandardMaterial({ color: 0x5c3137, roughness: 0.92 }));
+    kimono.position.y = 0.72; kimono.scale.z = 0.88; g.add(kimono);
+    const obi = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.18,0.22), new THREE.MeshStandardMaterial({ color: 0x312024, roughness: 0.88 })); obi.position.y = 0.78; g.add(obi);
+  }
+  if (type === 'maid') {
+    const apron = new THREE.Mesh(new THREE.BoxGeometry(0.48,0.72,0.08), new THREE.MeshStandardMaterial({ color: 0xe5e8ea, roughness: 1 }));
+    apron.position.set(0,0.96,0.15); g.add(apron);
+  }
+  if (type === 'guide') {
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.23,20,16), new THREE.MeshStandardMaterial({ color: 0xf1f2f4, roughness: 0.36 }));
+    helmet.position.y = 2.12; helmet.scale.y = 0.78; g.add(helmet);
+    const flagPoleL = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.68,8), new THREE.MeshStandardMaterial({ color: 0xcfd1d2, roughness: 0.5 }));
+    flagPoleL.position.set(-0.52,0.88,0.02); flagPoleL.rotation.z = 0.16; g.add(flagPoleL);
+    const flagL = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.18,0.02), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 })); flagL.position.set(-0.41,1.02,0.02); g.add(flagL);
+    const flagPoleR = flagPoleL.clone(); flagPoleR.position.x = 0.52; flagPoleR.rotation.z = -0.16; g.add(flagPoleR);
+    const flagR = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.18,0.02), new THREE.MeshStandardMaterial({ color: 0xc13a3a, roughness: 0.95 })); flagR.position.set(0.41,1.02,0.02); g.add(flagR);
+  }
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.42, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = -0.31; g.add(shadow);
+  g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; }});
+  return g;
 }
 function addNPC(id, name, faceType, costume, x, z, rot, onInteract){
   const npc = { id, name, x, z, rot: rot || 0, onInteract, faceType };
   npc.group = makeCharacter(faceType, costume);
-  npc.group.position.set(x, 0, z);
+  npc.group.position.set(x, 0.28, z);
   npc.group.rotation.y = rot || 0;
   dynamicGroup.add(npc.group);
   npcs.push(npc);
@@ -665,7 +642,6 @@ function buildArea(areaId){
   else if (areaId === 'room201') buildRoom201();
   else if (areaId === 'room202') buildRoom202();
   else if (areaId === 'bath') buildBath();
-  else if (areaId === 'toilet') buildToilet();
   else if (areaId === 'archive') buildArchive();
   else if (areaId === 'north') buildNorth();
   else if (areaId === 'detached') buildDetached();
@@ -674,11 +650,17 @@ function buildArea(areaId){
 
 function buildHome(){
   const night = state.step === 'sleep_day1';
-  scene.fog.color.set(night ? 0x070910 : 0x0b0d12);
-  scene.fog.near = 14; scene.fog.far = 34;
+  scene.background = new THREE.Color(night ? 0x0b0f17 : 0x6f7f93);
+  scene.fog.color.set(night ? 0x0b0f17 : 0x738193);
+  scene.fog.near = 18; scene.fog.far = 48;
+  hemi.intensity = night ? 0.9 : 1.45;
+  dirLight.intensity = night ? 0.7 : 1.9;
+  dirLight.position.set(-3, 8, 6);
   createFloor(10, 8, materials.wood, -0.1);
   createCeiling(10, 8, night ? 0xd7d2cb : 0xece7dd);
   wallSegment(0,-3.95,10,3.2,0.14,materials.wallWarm); wallSegment(0,3.95,10,3.2,0.14,materials.wallWarm); wallSegment(-4.95,0,0.14,3.2,8,materials.wallDark); wallSegment(4.95,0,0.14,3.2,8,materials.wallDark);
+  const homeWindow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.1), new THREE.MeshBasicMaterial({ color: night ? 0x24344a : 0xe7eef7 }));
+  homeWindow.position.set(-4.76, 1.95, -0.6); homeWindow.rotation.y = Math.PI / 2; areaGroup.add(homeWindow);
   const desk = new THREE.Mesh(new THREE.BoxGeometry(1.8,0.82,0.8), materials.darkWood); desk.position.set(-2.0,0.41,-2.2); desk.castShadow = desk.receiveShadow = true; areaGroup.add(desk); addBoxCollider(-2.0,-2.2,1.8,0.8);
   const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.8,1.8,0.5), materials.darkWood); shelf.position.set(-4.1,0.9,2.8); shelf.castShadow = shelf.receiveShadow = true; areaGroup.add(shelf); addBoxCollider(-4.1,2.8,0.8,0.5);
   const bag = new THREE.Mesh(new THREE.BoxGeometry(0.54,0.42,0.24), new THREE.MeshStandardMaterial({ color: 0x41474f, roughness: 0.92 })); bag.position.set(-1.8,0.9,-2.05); areaGroup.add(bag);
@@ -798,8 +780,6 @@ function buildTown(){
 
   addDoor('townToHome','自宅',-9.1,0,1.2,'home',{x:3.4,z:1.0,yaw:Math.PI/2},'x',0xc4c0b5);
   addDoor('townToLobby','旅館入口',12.7,4.1,1.85,'lobby',{x:0,z:4.8,yaw:Math.PI},undefined,0xc9b07a);
-  addPoster('missing', 9.4, 1.9, 3.22, 1.0, 1.48, 0);
-  addPoster('wanted', 15.8, 1.9, 3.22, 1.0, 1.48, 0);
   addBackdropPlane(realismAssets.exterior, 0, 4.4, -15.5, 18, 8.5, 0, 0.88);
   addNPC('villager','町の住民','villager',0x607b4d,-2.6,-1.2,Math.PI/2,npcInteract);
 }
@@ -867,7 +847,6 @@ function buildCorridor(){
   addDoor('corridorTo202','202',4.8,-4.58,1.2,'room202',{x:0,z:4.0,yaw:Math.PI},null,0xeaddcd);
   addDoor('corridorToBath','浴場',7.7,4.58,1.2,'bath',{x:-3.6,z:0,yaw:0},null,0xd7ecef);
   addDoor('corridorToNorth','北廊下',11.34,0,1.2,'north',{x:-3.7,z:0,yaw:0},'x',0xc3b28a);
-  addDoor('corridorToToilet','トイレ',9.65,4.58,1.2,'toilet',{x:-3.5,z:0,yaw:Math.PI},null,0xd8d0c6);
   const placard = makeLabelPlane('客室廊下', 1.8, 0.45); placard.position.set(-8.4,2.4,-4.6); areaGroup.add(placard);
   const amenityBox = new THREE.Mesh(new THREE.BoxGeometry(0.88,0.7,0.64), materials.darkWood); amenityBox.position.set(-6.1,0.35,2.4); amenityBox.castShadow = amenityBox.receiveShadow = true; areaGroup.add(amenityBox); addBoxCollider(-6.1,2.4,0.88,0.64);
   const slipperRack = new THREE.Group();
@@ -882,9 +861,6 @@ function buildCorridor(){
     addItem('lostKey','鍵束',3.2,1.25,lostKey,itemInteract);
   }
   addBackdropPlane(realismAssets.corridor, 0, 1.7, -4.2, 15.2, 2.7, 0, 0.72);
-  addPoster('wanted', -10.6, 1.7, -4.64, 1.05, 1.55, 0);
-  addPoster('missing', 2.4, 1.65, -4.64, 1.0, 1.45, 0);
-  addPoster('wanted', 9.7, 1.65, 4.64, 1.0, 1.45, Math.PI);
   addNPC('maid','仲居','maid',0x575a79,4.6,1.2,Math.PI,npcInteract);
 }
 
@@ -927,33 +903,9 @@ function buildBath(){
   if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',2.35,2.45, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
   addLamp(-2.3,0,0.7,0xffe6bc); addLamp(2.3,0,0.7,0xffe6bc);
   addDoor('bathToCorridor','客室廊下',-4.35,0,1.2,'corridor',{x:6.2,z:1.8,yaw:Math.PI},'x',0xddeff3);
-  addDoor('bathToToilet','トイレ',0,3.55,1.15,'toilet',{x:0,z:-3.0,yaw:0},null,0xd8d0c6);
   const phoneTable = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.52,0.58), materials.darkWood); phoneTable.position.set(2.5,0.26,-2.5); areaGroup.add(phoneTable); addBoxCollider(2.5,-2.5,0.9,0.58);
   const phone = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.14,0.32), materials.black); phone.position.set(2.5,0.61,-2.5); areaGroup.add(phone);
-  addPoster('missing', -4.68, 1.66, 1.45, 0.96, 1.4, Math.PI/2);
   addItem('phone','黒電話',2.5,-2.5, phone, itemInteract);
-}
-
-function buildToilet(){
-  createFloor(9.2, 8.2, materials.tile, -0.1);
-  createCeiling(9.2, 8.2, 0xe8e4df);
-  wallSegment(0,-4.05,9.2,3.2,0.14,materials.wallDark); wallSegment(0,4.05,9.2,3.2,0.14,materials.wallDark); wallSegment(-4.55,0,0.14,3.2,8.2,materials.wallDark); wallSegment(4.55,0,0.14,3.2,8.2,materials.wallDark);
-  addLamp(-1.8,0,0.55,0xffe6bc); addLamp(1.8,0,0.55,0xffe6bc);
-  const sink = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.86,0.7), new THREE.MeshStandardMaterial({ color: 0xc7c8ca, roughness: 0.88 })); sink.position.set(-2.5,0.43,-2.9); sink.castShadow = sink.receiveShadow = true; areaGroup.add(sink); addBoxCollider(-2.5,-2.9,2.4,0.7);
-  const mirror = new THREE.Mesh(new THREE.BoxGeometry(2.2,1.4,0.04), new THREE.MeshStandardMaterial({ color: 0x77889c, roughness: 0.18, metalness: 0.12 })); mirror.position.set(-2.5,1.5,-3.54); areaGroup.add(mirror);
-  for (const x of [0.2, 2.05]) {
-    const stallWall = new THREE.Mesh(new THREE.BoxGeometry(0.12,2.1,2.2), materials.wallRose); stallWall.position.set(x,1.05,1.0); stallWall.castShadow = stallWall.receiveShadow = true; areaGroup.add(stallWall); addBoxCollider(x,1.0,0.12,2.2);
-  }
-  const stallBack = new THREE.Mesh(new THREE.BoxGeometry(4.1,2.1,0.12), materials.wallRose); stallBack.position.set(2.2,1.05,2.05); stallBack.castShadow = stallBack.receiveShadow = true; areaGroup.add(stallBack); addBoxCollider(2.2,2.05,4.1,0.12);
-  const doorA = new THREE.Mesh(new THREE.BoxGeometry(1.6,1.96,0.08), new THREE.MeshStandardMaterial({ color: 0x8a7660, roughness: 0.9 })); doorA.position.set(1.1,0.98,-0.05); areaGroup.add(doorA);
-  const doorB = doorA.clone(); doorB.position.x = 3.1; areaGroup.add(doorB);
-  addPoster('wanted', -4.25, 1.7, -1.8, 1.1, 1.6, Math.PI/2);
-  addPoster('missing', -4.25, 1.75, 1.2, 1.18, 1.72, Math.PI/2);
-  addDoor('toiletToCorridor','客室廊下',-4.0,0,1.2,'corridor',{x:9.2,z:1.2,yaw:Math.PI},'x',0xd8d0c6);
-  addDoor('toiletToBath','浴場前',0,-3.55,1.1,'bath',{x:3.4,z:0,yaw:0},null,0xd8d0c6);
-  const crouch = makeCharacter('crouch'); crouch.position.set(3.1,0,1.35); dynamicGroup.add(crouch);
-  items.push({ id: 'toiletPeek', label: '個室の気配', x: 3.1, z: 1.35, mesh: crouch, onInteract: itemInteract });
-  addBackdropPlane(loadAssetTexture('assets/bg_toilet.jpg'), 0, 1.55, -3.95, 8.4, 2.9, 0, 0.88);
 }
 
 function buildArchive(){
@@ -967,8 +919,6 @@ function buildArchive(){
   const ledger = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.16,0.48), new THREE.MeshStandardMaterial({ color: 0x225688, roughness: 0.85 }));
   ledger.position.y = 1.16;
   addBackdropPlane(realismAssets.forbidden, 0, 1.7, -5.7, 12.4, 3.1, 0, 0.58);
-  addPoster('wanted', -6.5, 1.66, -1.1, 0.98, 1.45, Math.PI/2);
-  addPoster('missing', 6.5, 1.66, 1.25, 0.98, 1.45, -Math.PI/2);
   addItem('blueLedger','青い宿帳',0,1.8, ledger, itemInteract);
 }
 
@@ -981,7 +931,6 @@ function buildNorth(){
   addDoor('northToDetached','離れ通路',4.85,0,1.1,'detached',{x:-3.8,z:0,yaw:0},'x',0xa89676);
   const rope = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.06,0.06), new THREE.MeshStandardMaterial({ color: 0x8f5c3d, roughness: 1 })); rope.position.set(0,1.4,-1.8); rope.rotation.z = 0.25; areaGroup.add(rope);
   const seal = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.36,0.02), new THREE.MeshStandardMaterial({ color: 0xf7f1df, roughness: 1 })); seal.position.set(0,1.15,-1.78); areaGroup.add(seal);
-  addPoster('wanted', -5.24, 1.66, -0.85, 0.95, 1.38, Math.PI/2);
   addItem('sealTag','閉ざされた札',0,-1.8, seal, itemInteract);
 }
 
@@ -999,7 +948,6 @@ function buildDetached(){
   const roof = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.16,0.8), materials.wood); roof.position.y = 1.48; shrine.add(roof);
   shrine.position.set(0,0,-3.2); shrine.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; }}); areaGroup.add(shrine); addBoxCollider(0,-2.6,1.3,0.8);
   addBackdropPlane(realismAssets.forbidden, 0, 1.7, -4.75, 14, 3.1, 0, 0.55);
-  addPoster('missing', -7.55, 1.68, 0.85, 0.96, 1.42, Math.PI/2);
   addItem('altar','祠',0,-3.2, shrine, itemInteract);
 }
 
@@ -1071,12 +1019,10 @@ function itemInteract(entity){
     showDialogue(storyNodes.sleep_day1, () => {
       state.area = 'home';
       buildArea(state.area);
-      player.x = 3.2; player.z = 1.0; player.yaw = Math.PI / 2; player.pitch = 0;
+      player.x = 0.6; player.z = 2.6; player.yaw = 0; player.pitch = -0.05;
       resetInput();
       setStep('leave_home_day2');
     });
-  } else if (entity.id === 'toiletPeek') {
-    showDialogue(storyNodes.toiletPeek, () => {});
   } else if (entity.id === 'altar' && state.step === 'inspect_detached') {
     showDialogue(storyNodes.altar, () => {
       startChase('detached', { x: 0, z: 0 }, 'escape_detached');
@@ -1118,12 +1064,7 @@ function makePortrait(face){
   wrap.style.width = '100%'; wrap.style.height = '100%'; wrap.style.display = 'grid'; wrap.style.placeItems = 'center';
   const card = document.createElement('div');
   card.style.width = '82%'; card.style.aspectRatio = '0.68'; card.style.borderRadius = '18px';
-  const url = portraitImages[face];
-  if (url) {
-    card.style.background = `linear-gradient(180deg, rgba(255,255,255,.14), rgba(0,0,0,.16)), url(${url}) center/cover no-repeat`;
-  } else {
-    card.style.background = `linear-gradient(180deg, rgba(255,255,255,.14), rgba(0,0,0,.16)), url(${faceTextures[face].image.toDataURL()}) center/cover no-repeat`;
-  }
+  card.style.background = `linear-gradient(180deg, rgba(255,255,255,.14), rgba(0,0,0,.16)), url(${faceTextures[face].image.toDataURL()}) center/cover no-repeat`;
   card.style.border = '1px solid rgba(255,255,255,.12)';
   wrap.appendChild(card);
   return wrap;
@@ -1176,7 +1117,7 @@ function goHomeNow(){
   state.menuOpen = false;
   state.area = 'home';
   buildArea(state.area);
-  player.x = 2.4; player.z = 1.4; player.yaw = Math.PI / 2; player.pitch = 0;
+  player.x = 0.6; player.z = 2.6; player.yaw = 0; player.pitch = -0.05;
   resetInput();
   state.inputLockUntil = performance.now() + 500;
   state.doorCooldownUntil = performance.now() + 900;
@@ -1185,7 +1126,7 @@ function goHomeNow(){
 function spawnGuide(x,z){
   if (state.guide) dynamicGroup.remove(state.guide.group);
   const group = makeCharacter('guide', 0x2f4d7d);
-  group.position.set(x,0,z);
+  group.position.set(x,0.28,z);
   dynamicGroup.add(group);
   state.guide = { group, x, z, yaw: 0 };
 }
@@ -1410,7 +1351,7 @@ function updateChase(dt){
   const move = Math.min(state.chase.speed * dt, dist * 0.92);
   state.guide.group.position.x += (dx / Math.max(.001, dist)) * move;
   state.guide.group.position.z += (dz / Math.max(.001, dist)) * move;
-  state.guide.yaw = Math.atan2(dx, dz);
+  state.guide.group.rotation.y = Math.atan2(dx, dz);
 }
 
 function updateDoorLatch(){
@@ -1421,13 +1362,7 @@ function updateDoorLatch(){
   if (dist > door.radius + 1.2 && performance.now() > state.doorCooldownUntil) state.lastDoorId = null;
 }
 
-function updateBillboards(){
-  for (const npc of npcs) updateImageBillboard(npc.group, npc.rot || 0);
-  if (state.guide) updateImageBillboard(state.guide.group, state.guide.yaw || 0);
-}
-
 function update(){
-  updateBillboards();
   updateDoorLatch();
   updatePrompt();
   updateObjectiveDistance();
@@ -1612,6 +1547,9 @@ function setupControls(){
   joystickZone.addEventListener('pointerdown', startJoy);
   window.addEventListener('pointermove', moveJoy);
   window.addEventListener('pointerup', endJoy);
+  joystickZone.addEventListener('touchstart', function(e){ const t=e.changedTouches[0]; if(!t) return; e.preventDefault(); input.joyId='touch'; updateJoy(t); }, {passive:false});
+  window.addEventListener('touchmove', function(e){ if(input.joyId!=='touch') return; const t=e.changedTouches[0]; if(!t) return; e.preventDefault(); updateJoy(t); }, {passive:false});
+  window.addEventListener('touchend', function(e){ if(input.joyId!=='touch') return; input.joyId=null; input.joyX=0; input.joyY=0; centerJoystick(); }, {passive:false});
   lookZone.addEventListener('pointerdown', startLook);
   canvas.addEventListener('pointerdown', function(e){
     if (state.menuOpen) return;
@@ -1625,6 +1563,9 @@ function setupControls(){
   });
   window.addEventListener('pointermove', moveLook);
   window.addEventListener('pointerup', endLook);
+  lookZone.addEventListener('touchstart', function(e){ const t=e.changedTouches[0]; if(!t || state.menuOpen) return; input.lookId='touchlook'; input.lookDragging=true; input.pointerX=t.clientX; input.pointerY=t.clientY; }, {passive:false});
+  window.addEventListener('touchmove', function(e){ if(!input.lookDragging || input.lookId!=='touchlook' || state.menuOpen) return; const t=e.changedTouches[0]; if(!t) return; e.preventDefault(); const dx=t.clientX-input.pointerX; const dy=t.clientY-input.pointerY; input.pointerX=t.clientX; input.pointerY=t.clientY; rotateLook(dx,dy); }, {passive:false});
+  window.addEventListener('touchend', function(e){ if(input.lookId==='touchlook'){ input.lookDragging=false; input.lookId=null; } }, {passive:false});
   canvas.addEventListener('mousedown', function(e){ if (e.clientX > window.innerWidth * .38) { input.mouseDrag = true; input.pointerX = e.clientX; input.pointerY = e.clientY; } });
   window.addEventListener('mousemove', function(e){ if (!input.mouseDrag || state.menuOpen) return; const dx = e.clientX - input.pointerX; const dy = e.clientY - input.pointerY; input.pointerX = e.clientX; input.pointerY = e.clientY; rotateLook(dx,dy); });
   window.addEventListener('mouseup', function(){ input.mouseDrag = false; });
@@ -1684,7 +1625,7 @@ function beginNewGame(){
   menuOverlay.classList.add('hidden');
   stopChase();
   buildArea('home');
-  player.x = 2.6; player.z = 1.4; player.yaw = Math.PI / 2; player.pitch = 0;
+  player.x = 0.6; player.z = 2.6; player.yaw = 0; player.pitch = -0.05;
   resetInput();
   setStep('start_note');
 }
@@ -1708,4 +1649,16 @@ function init(){
 
 init();
 
+
+window.addEventListener('error', function(e){
+  let box = document.getElementById('fatal-debug');
+  if(!box){
+    box = document.createElement('div');
+    box.id='fatal-debug';
+    box.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;padding:12px 14px;border-radius:14px;background:rgba(80,0,0,.92);color:#fff;font:14px/1.5 sans-serif;white-space:pre-wrap';
+    document.body.appendChild(box);
+  }
+  box.textContent = 'runtime error: ' + (e.message || 'unknown') + '
+' + (e.filename || '') + ':' + (e.lineno || 0);
+});
 })();
