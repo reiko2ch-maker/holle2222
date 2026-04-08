@@ -1658,7 +1658,6 @@ window.addEventListener('error', function(e){
     box.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;padding:12px 14px;border-radius:14px;background:rgba(80,0,0,.92);color:#fff;font:14px/1.5 sans-serif;white-space:pre-wrap';
     document.body.appendChild(box);
   }
-  box.textContent = 'runtime error: ' + (e.message || 'unknown') + '
-' + (e.filename || '') + ':' + (e.lineno || 0);
+  box.textContent = 'runtime error: ' + (e.message || 'unknown') + '\n' + (e.filename || '') + ':' + (e.lineno || 0);
 });
 })();
