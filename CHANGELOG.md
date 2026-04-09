@@ -1,4 +1,4 @@
-## B17 Integrated Pass
+## B18 Visual & Cutscene Pass
 - B16のDAY3拡張をベースに、スマホ操作改善を再統合
 - RUNボタンを常時表示・タップ切替式に変更
 - LOOK感度と移動速度を微調整

@@ -49,9 +49,11 @@ renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.03;
 
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 90);
-const player = { x: 0, z: 0, yaw: 0, pitch: 0, height: 1.62, radius: 0.33, speed: 3.12, run: 1.28 };
+const player = { x: 0, z: 0, yaw: 0, pitch: 0, height: 1.62, radius: 0.33, speed: 3.28, run: 1.36 };
 
 const rootGroup = new THREE.Group();
 scene.add(rootGroup);
@@ -688,34 +690,62 @@ function maybeStartLobbyArrivalCutscene(entryDoorId){
   if (!(state.step === 'talk_okami' || state.step === 'walk_to_ryokan')) return;
   const okami = npcs.find(n => n.id === 'okami');
   if (!okami) return;
-  const sx = -6.1, sz = 2.55, ex = 0, ez = -3.0;
-  okami.group.position.set(sx, 0, sz); okami.x = sx; okami.z = sz; okami.rot = -0.35;
-  const yawSideDoor = 0.92;
+  const sx = -7.08, sz = 2.72, mx = -2.2, mz = 1.25, ex = 0, ez = -3.0;
+  okami.group.position.set(sx, 0, sz); okami.x = sx; okami.z = sz; okami.rot = -0.1;
+  const yawForward = 0;
+  const yawSideDoor = 0.96;
   const yawDesk = Math.PI;
   startCutscene([
     {
-      duration: 0.45,
-      onStart(){ player.pitch = -0.06; },
+      duration: 0.32,
+      onStart(){
+        player.yaw = yawForward;
+        player.pitch = -0.05;
+      },
+      onUpdate(t){
+        player.yaw = lerpAngle(player.yaw, yawForward, easeInOut(t));
+        player.pitch = lerp(player.pitch, -0.04, t);
+      }
+    },
+    {
+      duration: 0.42,
       onUpdate(t){ player.yaw = lerpAngle(player.yaw, yawSideDoor, easeInOut(t)); }
     },
     {
-      duration: 2.5,
+      duration: 1.05,
       onUpdate(t){
         const e = easeInOut(t);
-        okami.group.position.x = lerp(sx, ex, e);
-        okami.group.position.z = lerp(sz, ez, e);
+        okami.group.position.x = lerp(sx, mx, e);
+        okami.group.position.z = lerp(sz, mz, e);
         okami.x = okami.group.position.x;
         okami.z = okami.group.position.z;
-        const lookX = okami.group.position.x - player.x;
-        const lookZ = okami.group.position.z - player.z;
-        player.yaw = lerpAngle(player.yaw, Math.atan2(-lookX, -lookZ), 0.06);
+        const dx = okami.group.position.x - player.x;
+        const dz = okami.group.position.z - player.z;
+        player.yaw = lerpAngle(player.yaw, Math.atan2(-dx, -dz), 0.08);
+        okami.rot = Math.atan2(mx - okami.group.position.x, mz - okami.group.position.z);
+      }
+    },
+    {
+      duration: 1.55,
+      onUpdate(t){
+        const e = easeInOut(t);
+        okami.group.position.x = lerp(mx, ex, e);
+        okami.group.position.z = lerp(mz, ez, e);
+        okami.x = okami.group.position.x;
+        okami.z = okami.group.position.z;
+        const dx = okami.group.position.x - player.x;
+        const dz = okami.group.position.z - player.z;
+        player.yaw = lerpAngle(player.yaw, Math.atan2(-dx, -dz), 0.07);
         okami.rot = Math.atan2(ex - okami.group.position.x, ez - okami.group.position.z);
       },
       onEnd(){ okami.rot = Math.PI; }
     },
     {
-      duration: 0.55,
-      onUpdate(t){ player.yaw = lerpAngle(player.yaw, yawDesk, easeInOut(t)); player.pitch = lerp(player.pitch, -0.02, t); },
+      duration: 0.65,
+      onUpdate(t){
+        player.yaw = lerpAngle(player.yaw, yawDesk, easeInOut(t));
+        player.pitch = lerp(player.pitch, -0.02, t);
+      },
       onEnd(){ state.questFlags.okamiArrivalSceneDone = true; saveToSlot(1, true); }
     }
   ]);
@@ -1137,6 +1167,35 @@ function addLamp(x,z,intensity,color){
   bulb.position.set(x, 2.65, z); areaGroup.add(bulb);
   const p = new THREE.PointLight(color || 0xffd69a, intensity || 0.9, 11, 2.1);
   p.position.set(x, 2.5, z); p.castShadow = false; areaGroup.add(p);
+  return p;
+}
+function addFloorShadow(x, z, w, d, opacity=0.14, ry=0, y=0.018){
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, d),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity, depthWrite: false })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.rotation.z = ry;
+  shadow.position.set(x, y, z);
+  areaGroup.add(shadow);
+  return shadow;
+}
+function addWallGlow(x, y, z, w, h, ry=0, color=0xffd9a8, opacity=0.11){
+  const glow = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })
+  );
+  glow.position.set(x, y, z);
+  glow.rotation.y = ry;
+  areaGroup.add(glow);
+  return glow;
+}
+function addMoodLight(x, y, z, color=0xffd8a8, intensity=0.35, distance=5.5){
+  const p = new THREE.PointLight(color, intensity, distance, 2.2);
+  p.position.set(x, y, z);
+  p.castShadow = false;
+  areaGroup.add(p);
+  return p;
 }
 function doorModel(x,z,axis,label,color,opts={}){
   if (opts.style === 'fusuma') return fusumaDoorModel(x, z, axis, label);
@@ -1437,7 +1496,10 @@ function buildHome(){
   const futon = new THREE.Mesh(new THREE.BoxGeometry(2.6,0.22,2.6), new THREE.MeshStandardMaterial({ color: 0xf0eee8, roughness: 1 })); futon.position.set(0.8,0.02,0.9); areaGroup.add(futon); addBoxCollider(0.8,0.9,2.6,2.6);
   const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.16,0.34), materials.paper); pillow.position.set(0.1,0.15,-0.02); areaGroup.add(pillow);
   const doorMat = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.02,0.8), materials.carpet); doorMat.position.set(4.1,-0.08,1.0); areaGroup.add(doorMat);
-  addLamp(-2.6,-0.4, night ? 0.4 : 0.7); addLamp(2.6,0.2, night ? 0.34 : 0.58);
+  addLamp(-2.6,-0.4, night ? 0.46 : 0.78); addLamp(2.6,0.2, night ? 0.38 : 0.64);
+  addFloorShadow(-2.0,-2.2,2.1,1.2,0.16);
+  addFloorShadow(0.8,0.9,3.0,3.0,0.12);
+  addWallGlow(-4.78,1.95,-0.64,2.4,1.1,Math.PI/2, night ? 0x5876a0 : 0xe7eef7, night ? 0.18 : 0.10);
   const noteMesh = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.02,0.28), materials.paper); noteMesh.position.y = 0.84;
   if (state.step === 'start_note') addItem('scheduleNote','手紙',-2.0,-2.2,noteMesh,itemInteract);
   if (state.step === 'sleep_day1' || state.step === 'sleep_day2') {
@@ -1600,20 +1662,33 @@ function buildTown(){
   }
 
   addDoor('townToHome','自宅',-9.1,0,1.2,'home',{x:3.4,z:1.0,yaw:Math.PI/2},'x',0xc4c0b5);
-  addDoor('townToLobby','旅館入口',9.15,0,2.1,'lobby',{x:0,z:4.8,yaw:Math.PI},'x',0xc9b07a);
+  addDoor('townToLobby','旅館入口',9.15,0,2.1,'lobby',{x:0,z:4.8,yaw:0},'x',0xc9b07a);
   addBackdropPlane(realismAssets.exterior, 0, 4.4, -15.5, 18, 8.5, 0, 0.88);
   addNPC('villager','町の住民','villager','coat',-2.6,-1.2,Math.PI/2,npcInteract);
 }
 
 function buildLobby(){
   createFloor(16, 14, materials.tatami, -0.1);
-  createCeiling(16, 14, 0xf0eadc);
+  createCeiling(16, 14, 0xe8dfcf);
+  scene.fog.color.set(0x0c0c10);
+  scene.fog.near = 10;
+  scene.fog.far = 30;
+  hemi.intensity = 0.62;
+  dirLight.intensity = 0.55;
+  dirLight.position.set(4, 8, 2);
   wallSegment(0, -6.95, 16, 3.2, 0.14, materials.wallWarm);
   wallSegment(0, 6.95, 16, 3.2, 0.14, materials.wallWarm);
   wallSegment(-7.95, 0, 0.14, 3.2, 14, materials.darkWood);
   wallSegment(7.95, 0, 0.14, 3.2, 14, materials.darkWood);
   receptionDesk();
-  addLamp(-2.9, -0.8, 0.9); addLamp(2.9, -0.8, 0.9); addLamp(0, -2.2, 0.62);
+  addLamp(-2.9, -0.8, 0.86); addLamp(2.9, -0.8, 0.86); addLamp(0, -2.2, 0.72);
+  addMoodLight(0, 1.85, -4.25, 0xffd2a0, 0.30, 7.2);
+  addMoodLight(0, 0.45, -4.0, 0xffbe7a, 0.18, 4.5);
+  addFloorShadow(0, -4.1, 6.4, 2.55, 0.17);
+  addFloorShadow(0, 1.25, 7.0, 2.0, 0.10);
+  addWallGlow(0, 1.7, -6.66, 6.9, 1.85, 0, 0xffcf97, 0.08);
+  addWallGlow(-7.74, 1.45, -2.1, 3.2, 1.9, Math.PI / 2, 0x322012, 0.11);
+  addWallGlow(7.74, 1.45, 2.1, 3.2, 1.9, -Math.PI / 2, 0x322012, 0.11);
   const sign = makeLabelPlane('帳場', 1.5, 0.46); sign.position.set(0, 2.56, -6.82); areaGroup.add(sign);
   const rearShoji = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.18, 0.08), new THREE.MeshStandardMaterial({ color: 0xf1ead9, emissive: 0x7a5b26, emissiveIntensity: 0.09, roughness: 1 }));
   rearShoji.position.set(0, 0.86, -6.76); areaGroup.add(rearShoji);
@@ -1665,7 +1740,7 @@ function buildLobby(){
   addDoor('lobbyToCorridor', '客室廊下', 7.32, 0, 1.35, 'corridor', { x: -7.6, z: 0, yaw: 0 });
   addDoor('lobbyToKitchen', '厨房', -7.32, 2.6, 1.2, 'kitchen', { x: 5.0, z: -1.2, yaw: Math.PI });
   addDoor('lobbyToArchive', '宿帳庫', -7.32, -2.6, 1.2, 'archive', { x: 5.1, z: 0, yaw: Math.PI });
-  if (!state.questFlags.okamiArrivalSceneDone && (state.step === 'walk_to_ryokan' || state.step === 'talk_okami')) addNPC('okami', '女将', 'okami', 'suit', -6.1, 2.55, -0.35, npcInteract);
+  if (!state.questFlags.okamiArrivalSceneDone && (state.step === 'walk_to_ryokan' || state.step === 'talk_okami')) addNPC('okami', '女将', 'okami', 'suit', -7.08, 2.72, -0.15, npcInteract);
   else addNPC('okami', '女将', 'okami', 'suit', 0, -3.0, Math.PI, npcInteract);
 }
 
@@ -1696,7 +1771,12 @@ function buildKitchen(){
 
 function buildCorridor(){
   createFloor(24, 9.6, materials.wood, -0.1);
-  createCeiling(24, 9.6, 0xe7dcc9);
+  createCeiling(24, 9.6, 0xe0d4bf);
+  scene.fog.color.set(0x111115);
+  scene.fog.near = 11;
+  scene.fog.far = 29;
+  hemi.intensity = 0.55;
+  dirLight.intensity = 0.42;
   wallSegment(0,-4.75,24,3.2,0.14,materials.wallDark);
   wallSegment(0,4.75,24,3.2,0.14,materials.wallDark);
   wallSegment(-11.95,0,0.14,3.2,9.6,materials.wallDark);
@@ -1704,10 +1784,15 @@ function buildCorridor(){
 
   const runner = new THREE.Mesh(new THREE.BoxGeometry(22.8,0.04,2.55), materials.tatami);
   runner.position.set(0,-0.01,0); runner.receiveShadow = true; areaGroup.add(runner);
+  addFloorShadow(0,0,22.2,3.2,0.10);
+  addFloorShadow(0,-3.5,22.4,1.1,0.11);
+  addFloorShadow(0,3.5,22.4,1.1,0.11);
+  addWallGlow(0,1.2,-4.66,22.4,1.9,0,0x1b1410,0.09);
+  addWallGlow(0,1.2,4.66,22.4,1.9,Math.PI,0xffd4ab,0.05);
   addPebbleStrip(0,-2.2,22.8,0.95,0xb0a48e);
   addPebbleStrip(0,2.2,22.8,0.95,0xb0a48e);
   for (let x=-10; x<=10; x+=4) {
-    addLamp(x,0,0.62,0xffd7a6);
+    addLamp(x,0,0.68,0xffd7a6);
     addCeilingBeam(x, 0, 0.22, 9.2);
   }
   const sideRailA = new THREE.Mesh(new THREE.BoxGeometry(23.5,0.2,0.24), materials.darkWood);
@@ -1775,12 +1860,22 @@ function buildCorridor(){
 
 function buildRoom201(){
   createFloor(9, 9, materials.tatami, -0.1);
-  createCeiling(9, 9, 0xf2ece1);
+  createCeiling(9, 9, 0xeee5d7);
+  scene.fog.color.set(0x121015);
+  scene.fog.near = 10;
+  scene.fog.far = 24;
+  hemi.intensity = 0.52;
+  dirLight.intensity = 0.36;
   wallSegment(0,-4.45,9,3.2,0.14,materials.wallWarm); wallSegment(0,4.45,9,3.2,0.14,materials.wallWarm); wallSegment(-4.45,0,0.14,3.2,9,materials.wallDark); wallSegment(4.45,0,0.14,3.2,9,materials.wallDark);
   const alcove = new THREE.Mesh(new THREE.BoxGeometry(1.6,2.5,0.4), materials.darkWood); alcove.position.set(-3.2,1.25,-3.6); areaGroup.add(alcove); addBoxCollider(-3.2,-3.6,1.6,0.4);
   const futon = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.26,3.0), new THREE.MeshStandardMaterial({ color: 0xf1efe8, roughness: 1 })); futon.position.set(1.7,0.03,-1.2); areaGroup.add(futon); addBoxCollider(1.7,-1.2,2.2,3.0);
   const table = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.38,1.2), materials.darkWood); table.position.set(-0.2,0.19,0.8); areaGroup.add(table); addBoxCollider(-0.2,0.8,1.2,1.2);
-  addLamp(0,0,0.8); addDoor('room201ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:0,z:-1.8,yaw:0},null,0xf0e7d1,{style:'fusuma'});
+  addLamp(0,0,0.92);
+  addMoodLight(-3.2, 1.45, -2.9, 0xffcc95, 0.24, 4.2);
+  addFloorShadow(-0.2,0.8,1.8,1.8,0.15);
+  addFloorShadow(1.7,-1.2,2.7,3.3,0.13);
+  addWallGlow(0,1.65,-4.08,7.2,2.4,0,0xffd39e,0.06);
+  addDoor('room201ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:0,z:-1.8,yaw:0},null,0xf0e7d1,{style:'fusuma'});
   addBackdropPlane(realismAssets.roomA, 0, 1.65, -4.1, 7.6, 3.3, 0, 0.7);
   addTeaSet(-0.18, 0.82, 1.0);
   addAndonLamp(-3.78, 2.92, 0.62);
@@ -1791,12 +1886,21 @@ function buildRoom201(){
 
 function buildRoom202(){
   createFloor(9, 9, materials.tatami, -0.1);
-  createCeiling(9, 9, 0xf2ece1);
+  createCeiling(9, 9, 0xeee5d7);
+  scene.fog.color.set(0x121015);
+  scene.fog.near = 10;
+  scene.fog.far = 24;
+  hemi.intensity = 0.52;
+  dirLight.intensity = 0.36;
   wallSegment(0,-4.45,9,3.2,0.14,materials.wallWarm); wallSegment(0,4.45,9,3.2,0.14,materials.wallWarm); wallSegment(-4.45,0,0.14,3.2,9,materials.wallDark); wallSegment(4.45,0,0.14,3.2,9,materials.wallDark);
   const screen = new THREE.Mesh(new THREE.BoxGeometry(0.18,1.9,2.8), materials.shoji); screen.position.set(0.4,0.95,-2.2); areaGroup.add(screen); addBoxCollider(0.4,-2.2,0.18,2.8);
   const futon = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.26,2.8), new THREE.MeshStandardMaterial({ color: 0xf1efe8, roughness: 1 })); futon.position.set(1.7,0.03,-0.6); areaGroup.add(futon); addBoxCollider(1.7,-0.6,2.4,2.8);
   const table = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.38,1.0), materials.darkWood); table.position.set(-0.4,0.19,1.0); areaGroup.add(table); addBoxCollider(-0.4,1.0,1.3,1.0);
-  addLamp(0,0,0.8);
+  addLamp(0,0,0.92);
+  addMoodLight(-2.6, 1.4, -2.8, 0xffc98e, 0.22, 4.0);
+  addFloorShadow(-0.4,1.0,1.9,1.6,0.15);
+  addFloorShadow(1.7,-0.6,2.8,3.1,0.13);
+  addWallGlow(0,1.65,-4.08,7.2,2.4,0,0xffd39e,0.06);
   addDoor('room202ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:4.8,z:-1.2,yaw:0},null,0xeadfcb,{style:'fusuma'});
   addBackdropPlane(realismAssets.roomB, 0, 1.7, -4.1, 7.6, 3.4, 0, 0.74);
   addTeaSet(-0.4, 1.0, 1.0);
@@ -1806,13 +1910,21 @@ function buildRoom202(){
 
 function buildBath(){
   createFloor(15, 8, materials.tile, -0.1);
-  createCeiling(15, 8, 0xe9ecef);
+  createCeiling(15, 8, 0xe6e9ec);
+  scene.fog.color.set(0x10161a);
+  scene.fog.near = 11;
+  scene.fog.far = 26;
+  hemi.intensity = 0.52;
+  dirLight.intensity = 0.38;
   wallSegment(0,-3.95,15,3.2,0.14,materials.wallWarm);
   wallSegment(0,3.95,15,3.2,0.14,materials.wallWarm);
   wallSegment(-7.45,0,0.14,3.2,8,materials.wallWarm);
   wallSegment(7.45,0,0.14,3.2,8,materials.wallWarm);
 
   const runner = new THREE.Mesh(new THREE.BoxGeometry(6.2,0.03,3.2), new THREE.MeshStandardMaterial({ color: 0xd7d1c3, roughness: 1 }));
+  addFloorShadow(-1.0, 0.1, 7.2, 3.4, 0.10);
+  addFloorShadow(6.9, 0.2, 5.2, 6.4, 0.10);
+  addWallGlow(-0.9, 1.55, 3.76, 6.6, 1.7, Math.PI, 0xffd4aa, 0.06);
   runner.position.set(-2.2,-0.085,0); runner.receiveShadow = true; areaGroup.add(runner);
   addDoor('bathToCorridor','戻る',-6.85,0,1.25,'corridor',{x:6.2,z:1.8,yaw:Math.PI},'x',0xddeff3,{style:'noren', clothColor:0x5b3e2d, signText:'暖簾口'});
 
@@ -1847,7 +1959,8 @@ function buildBath(){
   for (const [tx,ty,tz] of [[4.5,1.15,2.47],[4.9,1.15,2.47],[5.3,1.15,2.47],[4.6,0.69,2.47],[5.0,0.69,2.47],[5.4,0.69,2.47]]) { const towel = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.24), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })); towel.position.set(tx,ty,tz); areaGroup.add(towel); }
   if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',4.9,2.45, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
 
-  addLamp(-4.7,0.2,0.55,0xffe6bc); addLamp(-1.0,0.2,0.55,0xffe6bc); addLamp(3.1,0.2,0.52,0xffe6bc);
+  addLamp(-4.7,0.2,0.62,0xffe6bc); addLamp(-1.0,0.2,0.62,0xffe6bc); addLamp(3.1,0.2,0.58,0xffe6bc);
+  addMoodLight(0.9, 1.3, 2.1, 0xffcf96, 0.16, 4.2);
   const phoneTable = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.52,0.58), materials.darkWood); phoneTable.position.set(2.55,0.26,-2.35); areaGroup.add(phoneTable); addBoxCollider(2.55,-2.35,0.9,0.58);
   const phone = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.14,0.32), materials.black); phone.position.set(2.55,0.61,-2.35); areaGroup.add(phone);
   addItem('phone','黒電話',2.55,-2.35, phone, itemInteract);
@@ -1906,7 +2019,12 @@ function buildBath(){
 
 function buildArchive(){
   createFloor(14, 12, materials.tile, -0.1);
-  createCeiling(14, 12, 0xdad8d6);
+  createCeiling(14, 12, 0xd6d3cf);
+  scene.fog.color.set(0x101217);
+  scene.fog.near = 11;
+  scene.fog.far = 25;
+  hemi.intensity = 0.48;
+  dirLight.intensity = 0.28;
   wallSegment(0,-5.95,14,3.2,0.14,materials.wallDark); wallSegment(0,5.95,14,3.2,0.14,materials.wallDark); wallSegment(-6.95,0,0.14,3.2,12,materials.wallDark); wallSegment(6.95,0,0.14,3.2,12,materials.wallDark);
   archiveShelves();
   addLamp(-2.6,0,0.6,0xffe0b4); addLamp(2.6,0,0.6,0xffe0b4);
@@ -1920,7 +2038,12 @@ function buildArchive(){
 
 function buildNorth(){
   createFloor(11, 7, materials.carpet, -0.1);
-  createCeiling(11, 7, 0xd7cab5);
+  createCeiling(11, 7, 0xd4c4ae);
+  scene.fog.color.set(0x121116);
+  scene.fog.near = 10;
+  scene.fog.far = 24;
+  hemi.intensity = 0.44;
+  dirLight.intensity = 0.26;
   wallSegment(0,-3.45,11,3.2,0.14,materials.wallDark); wallSegment(0,3.45,11,3.2,0.14,materials.wallDark); wallSegment(-5.45,0,0.14,3.2,7,materials.wallDark); wallSegment(5.45,0,0.14,3.2,7,materials.wallDark);
   addLamp(-2,0,0.45,0xffc388); addLamp(2.4,0,0.45,0xffc388);
   addDoor('northToCorridor','客室廊下',-4.85,0,1.1,'corridor',{x:8.1,z:0,yaw:Math.PI},'x',0xbda67e);
@@ -2776,7 +2899,7 @@ function onTouchEnd(e){
   if (findTouchByIdentifier(e.changedTouches, input.joyId)) clearJoyInput();
   if (findTouchByIdentifier(e.changedTouches, input.lookId)) clearLookInput();
 }
-function rotateLook(dx,dy){ player.yaw -= dx * 0.0122; player.pitch -= dy * 0.0088; player.pitch = Math.max(-1.05, Math.min(1.05, player.pitch)); }
+function rotateLook(dx,dy){ player.yaw -= dx * 0.0138; player.pitch -= dy * 0.0102; player.pitch = Math.max(-1.05, Math.min(1.05, player.pitch)); }
 function toggleMenu(force){
   if (state.cutscene) return;
   const open = typeof force === 'boolean' ? force : !state.menuOpen;
