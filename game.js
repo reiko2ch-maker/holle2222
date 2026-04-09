@@ -355,6 +355,133 @@ const realismAssets = {
   forbidden: loadAssetTexture('assets/forbidden_room.jpg'),
   exterior: loadAssetTexture('assets/ryokan_exterior_night.jpg')
 };
+
+const characterAssets = {
+  hero: {
+    front: loadAssetTexture('assets/characters/villager_front.png'),
+    side: loadAssetTexture('assets/characters/villager_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_smile.png')
+  },
+  okami: {
+    front: loadAssetTexture('assets/characters/okami_front.png'),
+    side: loadAssetTexture('assets/characters/okami_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_smile.png')
+  },
+  maid: {
+    front: loadAssetTexture('assets/characters/maid_front.png'),
+    side: loadAssetTexture('assets/characters/maid_front.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_smile.png')
+  },
+  guest: {
+    front: loadAssetTexture('assets/characters/villager_front.png'),
+    side: loadAssetTexture('assets/characters/villager_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_serious.png')
+  },
+  chef: {
+    front: loadAssetTexture('assets/characters/villager_front.png'),
+    side: loadAssetTexture('assets/characters/villager_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_serious.png')
+  },
+  villager: {
+    front: loadAssetTexture('assets/characters/villager_front.png'),
+    side: loadAssetTexture('assets/characters/villager_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_smile.png')
+  },
+  guide: {
+    front: loadAssetTexture('assets/characters/guide_front.png'),
+    side: loadAssetTexture('assets/characters/guide_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_serious.png')
+  },
+  crouch: {
+    front: loadAssetTexture('assets/characters/crouch_pose.png'),
+    side: loadAssetTexture('assets/characters/crouch_pose.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_serious.png'),
+    squat: 0.58
+  }
+};
+const portraitPaths = {
+  hero: 'assets/characters/portrait_smile.png',
+  okami: 'assets/characters/portrait_smile.png',
+  maid: 'assets/characters/portrait_smile.png',
+  guest: 'assets/characters/portrait_serious.png',
+  chef: 'assets/characters/portrait_serious.png',
+  villager: 'assets/characters/portrait_smile.png',
+  guide: 'assets/characters/portrait_serious.png'
+};
+function createBillboardCharacter(faceType, options={}){
+  const profile = characterAssets[faceType] || characterAssets.hero;
+  const height = options.height || 1.92;
+  const width = options.width || 0.88;
+  const squat = options.squat ?? profile.squat ?? 1;
+  const g = new THREE.Group();
+  g.userData.spriteType = faceType;
+  const spriteMat = new THREE.MeshStandardMaterial({
+    map: profile.front,
+    transparent: true,
+    alphaTest: 0.18,
+    side: THREE.DoubleSide,
+    roughness: 1,
+    metalness: 0,
+    depthWrite: false
+  });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height * squat), spriteMat);
+  plane.position.y = (height * squat) * 0.5;
+  plane.castShadow = true;
+  g.add(plane);
+  const rim = new THREE.Mesh(
+    new THREE.PlaneGeometry(width * 0.94, height * squat * 0.98),
+    new THREE.MeshBasicMaterial({ color: 0x0d0f13, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false })
+  );
+  rim.position.set(0, plane.position.y, -0.03);
+  g.add(rim);
+  const footShadow = new THREE.Mesh(
+    new THREE.CircleGeometry(width * 0.34, 24),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false })
+  );
+  footShadow.rotation.x = -Math.PI / 2;
+  footShadow.position.y = 0.02;
+  footShadow.scale.set(1.15, squat < 0.8 ? 0.78 : 1, 1);
+  g.add(footShadow);
+  if (squat < 0.8) {
+    plane.position.y = 0.66;
+    footShadow.position.z = 0.08;
+  }
+  g.userData.spritePlane = plane;
+  g.userData.spriteRim = rim;
+  g.userData.profile = profile;
+  return g;
+}
+function normalizeAngle(rad){
+  while (rad > Math.PI) rad -= Math.PI * 2;
+  while (rad < -Math.PI) rad += Math.PI * 2;
+  return rad;
+}
+function updateCharacterBillboard(entity){
+  if (!entity || !entity.group || !entity.group.userData || !entity.group.userData.spritePlane) return;
+  const profile = entity.group.userData.profile || characterAssets.hero;
+  const plane = entity.group.userData.spritePlane;
+  const rim = entity.group.userData.spriteRim;
+  const dx = camera.position.x - entity.group.position.x;
+  const dz = camera.position.z - entity.group.position.z;
+  const toCamera = Math.atan2(dx, dz);
+  const facing = entity.rot ?? entity.yaw ?? entity.group.rotation.y ?? 0;
+  const delta = normalizeAngle(toCamera - facing);
+  const absDelta = Math.abs(delta);
+  const useSide = absDelta > Math.PI * 0.25 && absDelta < Math.PI * 0.75 && !!profile.side;
+  plane.material.map = useSide ? profile.side : profile.front;
+  plane.material.needsUpdate = true;
+  const flip = delta >= 0 ? 1 : -1;
+  if (useSide) {
+    plane.scale.x = Math.abs(plane.scale.x) * flip;
+    if (rim) rim.scale.x = Math.abs(rim.scale.x) * flip;
+  } else {
+    plane.scale.x = Math.abs(plane.scale.x);
+    if (rim) rim.scale.x = Math.abs(rim.scale.x);
+  }
+  plane.rotation.y = toCamera;
+  if (rim) rim.rotation.y = toCamera;
+}
+
 function addBackdropPlane(tex, x, y, z, w, h, ry=0, opacity=0.92){
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: opacity < 1, opacity });
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
@@ -524,75 +651,14 @@ function archiveShelves(){
   }
 }
 
+
 function makeCharacter(type, costume){
-  const g = new THREE.Group();
-  const skin = new THREE.MeshStandardMaterial({ color: 0xe7cbb8, roughness: 0.68, metalness: 0.02 });
-  const clothing = new THREE.MeshStandardMaterial({ color: costume || 0x374c7a, roughness: 0.86, metalness: 0.01 });
-  const clothingDark = new THREE.MeshStandardMaterial({ color: 0x262a31, roughness: 0.9 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: 0x171819, roughness: 0.92 });
-  const shoeMat = new THREE.MeshStandardMaterial({ color: 0x0d0f16, roughness: 0.82 });
-
-  const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.24,0.24), clothing);
-  pelvis.position.y = 0.74;
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.22,0.58,6,10), clothing);
-  torso.position.y = 1.18; torso.scale.z = 0.9;
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.085,0.12,12), skin); neck.position.y = 1.62;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 26, 22), skin); head.position.y = 1.88; head.scale.set(0.96,1.08,0.96);
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.028,0.1,10), skin); nose.position.set(0,1.86,0.19); nose.rotation.x = Math.PI/2;
-  const browL = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.018,0.02), hairMat); browL.position.set(-0.055,1.93,0.185); browL.rotation.z = -0.08;
-  const browR = browL.clone(); browR.position.x = 0.055; browR.rotation.z = 0.08;
-  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.018,8,8), new THREE.MeshBasicMaterial({ color: 0x1a1a1a })); eyeL.position.set(-0.055,1.87,0.196); eyeL.scale.z = 0.4;
-  const eyeR = eyeL.clone(); eyeR.position.x = 0.055;
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.012,0.02), new THREE.MeshBasicMaterial({ color: type === 'guide' ? 0x866868 : 0x8c5d56 })); mouth.position.set(0,1.78,0.19);
-  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.225,22,18,0,Math.PI*2,0,Math.PI/2), hairMat); hairCap.position.set(0,1.96,-0.01); hairCap.scale.set(1.04,0.9,1.05);
-  const hairBack = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.28,0.16), hairMat); hairBack.position.set(0,1.88,-0.11);
-
-  const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.095,12,12), clothing); shoulderL.position.set(-0.28,1.4,0);
-  const shoulderR = shoulderL.clone(); shoulderR.position.x = 0.28;
-  const upperArmL = new THREE.Mesh(new THREE.CapsuleGeometry(0.07,0.34,5,10), clothing); upperArmL.position.set(-0.36,1.12,0); upperArmL.rotation.z = 0.14;
-  const upperArmR = upperArmL.clone(); upperArmR.position.x = 0.36; upperArmR.rotation.z = -0.14;
-  const foreArmL = new THREE.Mesh(new THREE.CapsuleGeometry(0.058,0.28,5,10), clothingDark); foreArmL.position.set(-0.4,0.84,0.01); foreArmL.rotation.z = 0.09;
-  const foreArmR = foreArmL.clone(); foreArmR.position.x = 0.4; foreArmR.rotation.z = -0.09;
-  const handL = new THREE.Mesh(new THREE.SphereGeometry(0.06,12,12), skin); handL.position.set(-0.43,0.61,0.02);
-  const handR = handL.clone(); handR.position.x = 0.43;
-
-  const thighL = new THREE.Mesh(new THREE.CapsuleGeometry(0.085,0.34,5,10), clothingDark); thighL.position.set(-0.12,0.35,0.01);
-  const thighR = thighL.clone(); thighR.position.x = 0.12;
-  const calfL = new THREE.Mesh(new THREE.CapsuleGeometry(0.07,0.34,5,10), clothingDark); calfL.position.set(-0.12,-0.02,0.01);
-  const calfR = calfL.clone(); calfR.position.x = 0.12;
-  const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.1,0.36), shoeMat); shoeL.position.set(-0.12,-0.29,0.05);
-  const shoeR = shoeL.clone(); shoeR.position.x = 0.12;
-
-  g.add(pelvis, torso, neck, head, nose, browL, browR, eyeL, eyeR, mouth, hairCap, hairBack, shoulderL, shoulderR, upperArmL, upperArmR, foreArmL, foreArmR, handL, handR, thighL, thighR, calfL, calfR, shoeL, shoeR);
-
-  if (type === 'okami') {
-    const kimono = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.34,1.34,22,1), new THREE.MeshStandardMaterial({ color: 0x5c3137, roughness: 0.92 }));
-    kimono.position.y = 0.72; kimono.scale.z = 0.88; g.add(kimono);
-    const obi = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.18,0.22), new THREE.MeshStandardMaterial({ color: 0x312024, roughness: 0.88 })); obi.position.y = 0.78; g.add(obi);
-  }
-  if (type === 'maid') {
-    const apron = new THREE.Mesh(new THREE.BoxGeometry(0.48,0.72,0.08), new THREE.MeshStandardMaterial({ color: 0xe5e8ea, roughness: 1 }));
-    apron.position.set(0,0.96,0.15); g.add(apron);
-  }
-  if (type === 'guide') {
-    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.23,20,16), new THREE.MeshStandardMaterial({ color: 0xf1f2f4, roughness: 0.36 }));
-    helmet.position.y = 2.12; helmet.scale.y = 0.78; g.add(helmet);
-    const flagPoleL = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.68,8), new THREE.MeshStandardMaterial({ color: 0xcfd1d2, roughness: 0.5 }));
-    flagPoleL.position.set(-0.52,0.88,0.02); flagPoleL.rotation.z = 0.16; g.add(flagPoleL);
-    const flagL = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.18,0.02), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 })); flagL.position.set(-0.41,1.02,0.02); g.add(flagL);
-    const flagPoleR = flagPoleL.clone(); flagPoleR.position.x = 0.52; flagPoleR.rotation.z = -0.16; g.add(flagPoleR);
-    const flagR = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.18,0.02), new THREE.MeshStandardMaterial({ color: 0xc13a3a, roughness: 0.95 })); flagR.position.set(0.41,1.02,0.02); g.add(flagR);
-  }
-  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.42, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 }));
-  shadow.rotation.x = -Math.PI / 2; shadow.position.y = -0.31; g.add(shadow);
-  g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; }});
-  return g;
+  return createBillboardCharacter(type);
 }
 function addNPC(id, name, faceType, costume, x, z, rot, onInteract){
   const npc = { id, name, x, z, rot: rot || 0, onInteract, faceType };
-  npc.group = makeCharacter(faceType, costume);
-  npc.group.position.set(x, 0.28, z);
-  npc.group.rotation.y = rot || 0;
+  npc.group = createBillboardCharacter(faceType, { baseYaw: rot || 0 });
+  npc.group.position.set(x, 0, z);
   dynamicGroup.add(npc.group);
   npcs.push(npc);
   return npc;
@@ -1064,7 +1130,12 @@ function makePortrait(face){
   wrap.style.width = '100%'; wrap.style.height = '100%'; wrap.style.display = 'grid'; wrap.style.placeItems = 'center';
   const card = document.createElement('div');
   card.style.width = '82%'; card.style.aspectRatio = '0.68'; card.style.borderRadius = '18px';
-  card.style.background = `linear-gradient(180deg, rgba(255,255,255,.14), rgba(0,0,0,.16)), url(${faceTextures[face].image.toDataURL()}) center/cover no-repeat`;
+  const path = portraitPaths[face];
+  if (path) {
+    card.style.background = `linear-gradient(180deg, rgba(255,255,255,.14), rgba(0,0,0,.16)), url(${path}) center/cover no-repeat`;
+  } else {
+    card.style.background = `linear-gradient(180deg, rgba(255,255,255,.14), rgba(0,0,0,.16)), url(${faceTextures[face].image.toDataURL()}) center/cover no-repeat`;
+  }
   card.style.border = '1px solid rgba(255,255,255,.12)';
   wrap.appendChild(card);
   return wrap;
@@ -1126,9 +1197,10 @@ function goHomeNow(){
 function spawnGuide(x,z){
   if (state.guide) dynamicGroup.remove(state.guide.group);
   const group = makeCharacter('guide', 0x2f4d7d);
-  group.position.set(x,0.28,z);
+  group.position.set(x,0,z);
   dynamicGroup.add(group);
   state.guide = { group, x, z, yaw: 0 };
+  updateCharacterBillboard(state.guide);
 }
 function triggerGameOver(){
   state.menuOpen = true;
@@ -1367,6 +1439,8 @@ function update(){
   updatePrompt();
   updateObjectiveDistance();
   updateMinimap();
+  npcs.forEach(updateCharacterBillboard);
+  if (state.guide) updateCharacterBillboard(state.guide);
   if (state.hudHidden) {
     hud.style.display = 'none';
     joystickZone.style.display = 'none';
