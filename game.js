@@ -359,12 +359,6 @@ const posterAssets = {
   missing: loadAssetTexture('assets/posters/missing.jpg'),
   wanted: loadAssetTexture('assets/posters/wanted.jpg')
 };
-const decorAssets = {
-  fusumaGold: loadAssetTexture('assets/decor/fusuma_gold.jpg'),
-  fusumaLeft: loadAssetTexture('assets/decor/fusuma_left.jpg'),
-  fusumaCenter: loadAssetTexture('assets/decor/fusuma_center.jpg'),
-  fusumaRight: loadAssetTexture('assets/decor/fusuma_right.jpg')
-};
 
 const characterAssets = {
   hero: {
@@ -636,6 +630,188 @@ function addTeaSet(x, z, scale=1){
 }
 
 
+function addPebbleStrip(x, z, w, d, color=0xaea38f){
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), new THREE.MeshStandardMaterial({ color, roughness: 1 }));
+  strip.position.set(x, -0.08, z);
+  strip.receiveShadow = true;
+  areaGroup.add(strip);
+  return strip;
+}
+function makeTextPlane(text, scaleX, scaleY, opts={}){
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  const bg = opts.bg ?? 'rgba(0,0,0,0)';
+  g.fillStyle = bg;
+  g.fillRect(0,0,512,256);
+  g.fillStyle = opts.fg || '#f5efe4';
+  g.font = `bold ${opts.fontSize || 106}px sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, 256, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(scaleX, scaleY), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  return mesh;
+}
+function addBambooPlant(x, z, scale=1){
+  const g = new THREE.Group();
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.18*scale, 0.22*scale, 0.34*scale, 14), new THREE.MeshStandardMaterial({ color: 0x58473a, roughness: 0.94 }));
+  pot.position.y = 0.17*scale;
+  g.add(pot);
+  for (const dx of [-0.08, 0.02, 0.11]) {
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.022*scale, 0.028*scale, 0.92*scale, 8), new THREE.MeshStandardMaterial({ color: 0x6b8b46, roughness: 1 }));
+    stem.position.set(dx*scale, 0.62*scale, 0);
+    g.add(stem);
+    for (const [ly,lz,rz] of [[0.54,0.04,-0.8],[0.72,-0.02,0.7],[0.86,0.03,-0.45]]) {
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.18*scale, 0.03*scale, 0.08*scale), new THREE.MeshStandardMaterial({ color: 0x56733b, roughness: 1 }));
+      leaf.position.set(dx*scale + 0.07*scale*Math.sign(rz), ly*scale, lz*scale);
+      leaf.rotation.z = rz;
+      g.add(leaf);
+    }
+  }
+  g.position.set(x,0,z);
+  g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  areaGroup.add(g);
+  return g;
+}
+function addCeilingBeam(x, z, w, d, ry=0){
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), materials.darkWood);
+  beam.position.set(x, 3.18, z);
+  beam.rotation.y = ry;
+  beam.castShadow = true;
+  beam.receiveShadow = true;
+  areaGroup.add(beam);
+  return beam;
+}
+function addShojiWallSpan(x, z, w, opts={}){
+  const g = new THREE.Group();
+  const height = opts.height || 2.28;
+  const side = opts.side || 'north';
+  const bg = new THREE.Mesh(new THREE.BoxGeometry(w, height, 0.06), new THREE.MeshStandardMaterial({ color: opts.baseColor || 0xeadfcb, roughness: 1 }));
+  bg.position.y = height * 0.5;
+  g.add(bg);
+  const postCount = Math.max(3, Math.round(w / 1.0));
+  for (let i = 0; i <= postCount; i++) {
+    const px = -w/2 + i * (w/postCount);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, height + 0.16, 0.1), materials.darkWood);
+    post.position.set(px, height*0.5, 0.02);
+    g.add(post);
+  }
+  for (let r = 0; r < 3; r++) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w - 0.08, 0.06, 0.08), materials.darkWood);
+    bar.position.set(0, 0.46 + r * 0.62, 0.03);
+    g.add(bar);
+  }
+  const paper = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.24, height - 0.28), new THREE.MeshStandardMaterial({ color: opts.paperColor || 0xf7f0df, emissive: opts.emissive || 0x7a5b26, emissiveIntensity: opts.glow ? 0.12 : 0.03, roughness: 1, transparent: true, opacity: 0.94 }));
+  paper.position.set(0, height * 0.52, 0.04);
+  g.add(paper);
+  g.position.set(x, 0, z);
+  g.rotation.y = side === 'south' ? Math.PI : (side === 'east' ? -Math.PI/2 : side === 'west' ? Math.PI/2 : 0);
+  g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  areaGroup.add(g);
+  return g;
+}
+function fusumaDoorModel(x, z, axis, label){
+  const g = new THREE.Group();
+  const frameW = 1.66;
+  const frameH = 2.34;
+  const postL = new THREE.Mesh(new THREE.BoxGeometry(0.1, frameH, 0.18), materials.darkWood);
+  const postR = postL.clone();
+  postL.position.set(-frameW/2, frameH/2, 0); postR.position.set(frameW/2, frameH/2, 0);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(frameW + 0.1, 0.12, 0.18), materials.darkWood);
+  top.position.set(0, frameH - 0.06, 0);
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(frameW + 0.04, 0.08, 0.18), materials.darkWood);
+  sill.position.set(0, 0.04, 0);
+  g.add(postL, postR, top, sill);
+  const panelMat = new THREE.MeshStandardMaterial({ color: 0xf0e6d6, roughness: 1 });
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.72, 2.02, 0.06), panelMat);
+  const right = left.clone();
+  left.position.set(-0.35, 1.05, 0.01); right.position.set(0.35, 1.05, -0.01);
+  g.add(left, right);
+  for (const panel of [left, right]) {
+    const bars = new THREE.Group();
+    for (let i = -1; i <= 1; i++) {
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.82, 0.025), materials.darkWood);
+      v.position.set(i*0.18, 1.05, 0.04);
+      bars.add(v);
+    }
+    for (let y of [0.42, 0.96, 1.48]) {
+      const h = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.04, 0.025), materials.darkWood);
+      h.position.set(0, y, 0.04);
+      bars.add(h);
+    }
+    bars.position.x = panel.position.x;
+    g.add(bars);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 10), materials.brass);
+    handle.rotation.z = Math.PI / 2;
+    handle.position.set(panel.position.x > 0 ? 0.08 : -0.08, 1.02, 0.05);
+    g.add(handle);
+  }
+  const sign = makeTextPlane(label || '客室', 0.7, 0.18, { fg: '#f5efe4', bg: 'rgba(0,0,0,.35)', fontSize: 76 });
+  sign.position.set(0, 2.62, 0.03);
+  g.add(sign);
+  if (axis === 'x') g.rotation.y = Math.PI/2;
+  g.position.set(x,0,z);
+  g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  areaGroup.add(g);
+  return g;
+}
+function norenDoorModel(x, z, axis, label, opts={}){
+  const g = new THREE.Group();
+  const width = opts.width || 1.72;
+  const height = opts.height || 2.18;
+  const clothColor = opts.clothColor || 0x203d5a;
+  const postL = new THREE.Mesh(new THREE.BoxGeometry(0.1, height + 0.12, 0.16), materials.darkWood);
+  const postR = postL.clone();
+  postL.position.set(-width/2, (height+0.12)/2, 0);
+  postR.position.set(width/2, (height+0.12)/2, 0);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(width + 0.1, 0.12, 0.16), materials.darkWood);
+  top.position.set(0, height + 0.06, 0);
+  g.add(postL, postR, top);
+  const clothMat = new THREE.MeshStandardMaterial({ color: clothColor, roughness: 1, side: THREE.DoubleSide });
+  for (let i = 0; i < 2; i++) {
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(width*0.46, 1.55), clothMat);
+    cloth.position.set(i === 0 ? -width*0.24 : width*0.24, 1.5, 0.04);
+    g.add(cloth);
+  }
+  const text = makeTextPlane(label || '暖簾', 0.9, 0.28, { fg: '#f8f4ea', fontSize: 110 });
+  text.position.set(0, 1.55, 0.05);
+  g.add(text);
+  if (opts.subLabel) {
+    const sub = makeTextPlane(opts.subLabel, 0.85, 0.16, { fg: '#f1ebdc', fontSize: 56 });
+    sub.position.set(0, 0.56, 0.05);
+    g.add(sub);
+  }
+  if (opts.blocked) {
+    const stand = makeCleaningSign(0.8, 0.54, opts.cleanText || '清掃中');
+    stand.position.set(0,0,0.52);
+    g.add(stand);
+  }
+  if (axis === 'x') g.rotation.y = Math.PI/2;
+  g.position.set(x,0,z);
+  g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  areaGroup.add(g);
+  return g;
+}
+function makeCleaningSign(w=0.8, h=0.5, text='清掃中'){
+  const g = new THREE.Group();
+  const board = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.06), new THREE.MeshStandardMaterial({ color: 0xf6f0df, roughness: 1 }));
+  board.position.y = 0.72;
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(w+0.06, h+0.06, 0.03), materials.darkWood);
+  frame.position.set(0,0.72,-0.03);
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.72, 0.05), materials.darkWood);
+  const legR = legL.clone();
+  legL.position.set(-0.18,0.34,0.1); legL.rotation.z = 0.15;
+  legR.position.set(0.18,0.34,0.1); legR.rotation.z = -0.15;
+  const txt = makeTextPlane(text, w*0.82, h*0.48, { fg: '#1a120d', fontSize: 82 });
+  txt.position.set(0,0.72,0.04);
+  g.add(frame, board, legL, legR, txt);
+  g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  return g;
+}
+
+
 function makeWoodTexture(w, h, dark){
   const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d');
   const base=dark? '#4a3729':'#7a5b42';
@@ -714,7 +890,9 @@ function addLamp(x,z,intensity,color){
   const p = new THREE.PointLight(color || 0xffd69a, intensity || 0.9, 11, 2.1);
   p.position.set(x, 2.5, z); p.castShadow = false; areaGroup.add(p);
 }
-function doorModel(x,z,axis,label,color){
+function doorModel(x,z,axis,label,color,opts={}){
+  if (opts.style === 'fusuma') return fusumaDoorModel(x, z, axis, label);
+  if (opts.style === 'noren') return norenDoorModel(x, z, axis, opts.signText || label, opts);
   const g = new THREE.Group();
   const frameMat = materials.darkWood;
   const panelMat = new THREE.MeshStandardMaterial({ color: color || 0xe8dcc2, roughness: 0.95 });
@@ -831,8 +1009,8 @@ function addItem(id, label, x, z, mesh, onInteract){
   dynamicGroup.add(mesh);
   items.push({ id, label, x, z, mesh, onInteract });
 }
-function addDoor(id, label, x, z, radius, toArea, toSpawn, axis, color){
-  doorModel(x, z, axis, label, color);
+function addDoor(id, label, x, z, radius, toArea, toSpawn, axis, color, opts){
+  doorModel(x, z, axis, label, color, opts || {});
   doors.push({ id, label, x, z, radius: radius || 1.18, toArea, toSpawn });
 }
 
@@ -1096,21 +1274,42 @@ function buildKitchen(){
 function buildCorridor(){
   createFloor(24, 9.6, materials.wood, -0.1);
   createCeiling(24, 9.6, 0xe7dcc9);
-  wallSegment(0,-4.75,24,3.2,0.14,materials.darkWood); wallSegment(0,4.75,24,3.2,0.14,materials.darkWood); wallSegment(-11.95,0,0.14,3.2,9.6,materials.wallDark); wallSegment(11.95,0,0.14,3.2,9.6,materials.wallDark);
-  for(let i=-10;i<=10;i+=4){ addLamp(i,0,0.72,0xffd7a6); }
-  for(let z of [-3.4,3.4]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(23.6,0.9,0.18), materials.darkWood); rail.position.set(0,0.45,z); rail.castShadow = rail.receiveShadow = true; areaGroup.add(rail); addBoxCollider(0,z,23.6,0.18);
+  wallSegment(0,-4.75,24,3.2,0.14,materials.wallDark);
+  wallSegment(0,4.75,24,3.2,0.14,materials.wallDark);
+  wallSegment(-11.95,0,0.14,3.2,9.6,materials.wallDark);
+  wallSegment(11.95,0,0.14,3.2,9.6,materials.wallDark);
+
+  const runner = new THREE.Mesh(new THREE.BoxGeometry(22.8,0.04,2.55), materials.tatami);
+  runner.position.set(0,-0.01,0); runner.receiveShadow = true; areaGroup.add(runner);
+  addPebbleStrip(0,-2.2,22.8,0.95,0xb0a48e);
+  addPebbleStrip(0,2.2,22.8,0.95,0xb0a48e);
+  for (let x=-10; x<=10; x+=4) {
+    addLamp(x,0,0.62,0xffd7a6);
+    addCeilingBeam(x, 0, 0.22, 9.2);
   }
+  const sideRailA = new THREE.Mesh(new THREE.BoxGeometry(23.5,0.2,0.24), materials.darkWood);
+  sideRailA.position.set(0,0.18,-4.22); sideRailA.castShadow = sideRailA.receiveShadow = true; areaGroup.add(sideRailA);
+  const sideRailB = sideRailA.clone(); sideRailB.position.z = 4.22; areaGroup.add(sideRailB);
+
   addDoor('corridorToLobby','帳場',-11.34,0,1.2,'lobby',{x:7.1,z:0,yaw:Math.PI},'x');
-  addDoor('corridorTo201','201',0,-4.58,1.2,'room201',{x:0,z:4.0,yaw:Math.PI},null,0xf0e7d1);
-  addDoor('corridorTo202','202',4.8,-4.58,1.2,'room202',{x:0,z:4.0,yaw:Math.PI},null,0xeaddcd);
-  addDoor('corridorToBath','浴場',7.7,4.58,1.2,'bath',{x:-5.2,z:0,yaw:0},null,0xd7ecef);
   addDoor('corridorToNorth','北廊下',11.34,0,1.2,'north',{x:-3.7,z:0,yaw:0},'x',0xc3b28a);
-  const placard = makeLabelPlane('客室廊下', 1.8, 0.45); placard.position.set(-8.4,2.4,-4.6); areaGroup.add(placard);
-  const amenityBox = new THREE.Mesh(new THREE.BoxGeometry(0.88,0.7,0.64), materials.darkWood); amenityBox.position.set(-6.1,0.35,2.4); amenityBox.castShadow = amenityBox.receiveShadow = true; areaGroup.add(amenityBox); addBoxCollider(-6.1,2.4,0.88,0.64);
-  addDecorPanel(decorAssets.fusumaLeft, -6.0, 1.6, -4.66, 5.6, 2.75, 0);
-  addDecorPanel(decorAssets.fusumaCenter, 2.4, 1.6, -4.66, 2.2, 2.75, 0);
-  addDecorPanel(decorAssets.fusumaRight, 8.55, 1.6, -4.66, 4.9, 2.75, 0);
+  addDoor('corridorTo201','201',0,-4.58,1.25,'room201',{x:0,z:4.0,yaw:Math.PI},null,0xf0e7d1,{style:'fusuma'});
+  addDoor('corridorTo202','202',4.8,-4.58,1.25,'room202',{x:0,z:4.0,yaw:Math.PI},null,0xeaddcd,{style:'fusuma'});
+  addDoor('corridorToBath','男湯',8.55,3.95,1.35,'bath',{x:-5.2,z:0,yaw:0},null,0xd7ecef,{style:'noren', clothColor:0x2a3f53, subLabel:'MEN'});
+  norenDoorModel(4.75, 3.95, null, '女湯', { clothColor:0x7a463b, subLabel:'WOMEN', blocked:true, cleanText:'清掃中' });
+
+  const placard = makeTextPlane('客室廊下', 1.7, 0.34, { fg:'#f2ecdf', bg:'rgba(14,10,8,.5)', fontSize:78 });
+  placard.position.set(-8.4,2.45,-4.58); areaGroup.add(placard);
+
+  addShojiWallSpan(-8.1, 4.66, 5.8, { side:'south', glow:true });
+  addShojiWallSpan(-0.9, 4.66, 4.2, { side:'south', glow:true });
+  addShojiWallSpan(3.1, 4.66, 1.6, { side:'south', glow:true });
+  addShojiWallSpan(-2.35, -4.66, 3.7, { side:'north' });
+  addShojiWallSpan(2.25, -4.66, 1.9, { side:'north' });
+  addShojiWallSpan(7.55, -4.66, 2.2, { side:'north' });
+
+  const amenityBox = new THREE.Mesh(new THREE.BoxGeometry(0.88,0.7,0.64), materials.darkWood);
+  amenityBox.position.set(-6.1,0.35,2.4); amenityBox.castShadow = amenityBox.receiveShadow = true; areaGroup.add(amenityBox); addBoxCollider(-6.1,2.4,0.88,0.64);
   const slipperRack = new THREE.Group();
   const rackBase = new THREE.Mesh(new THREE.BoxGeometry(1.7,0.55,0.36), materials.darkWood); rackBase.position.set(0,0.28,0); slipperRack.add(rackBase);
   for (const [sx,sz] of [[-0.45,-0.06],[0,0.04],[0.45,-0.02]]) { const pair = new THREE.Mesh(new THREE.BoxGeometry(0.28,0.08,0.16), new THREE.MeshStandardMaterial({ color: 0xe8e0ce, roughness: 1 })); pair.position.set(sx,0.38,sz); slipperRack.add(pair); }
@@ -1122,12 +1321,15 @@ function buildCorridor(){
     lostKey.rotation.x = Math.PI/2; lostKey.position.y = 0.06;
     addItem('lostKey','鍵束',3.2,1.25,lostKey,itemInteract);
   }
-  addBackdropPlane(realismAssets.corridor, -7.1, 1.7, 4.2, 6.2, 2.7, Math.PI, 0.6);
-  addBackdropPlane(realismAssets.corridor, 7.4, 1.7, 4.2, 5.8, 2.7, Math.PI, 0.56);
-  addAndonLamp(-10.5, 3.86, 0.72);
-  addAndonLamp(10.55, 3.86, 0.72);
-  addIkebana(-1.8, 3.92, 0.82);
-  addUmbrellaStand(9.8, 3.72, 0.72, Math.PI);
+  addAndonLamp(-10.45, 3.78, 0.8);
+  addAndonLamp(-6.0, 3.78, 0.72);
+  addAndonLamp(0.1, 3.78, 0.72);
+  addAndonLamp(10.5, 3.78, 0.8);
+  addBambooPlant(-7.2, 3.76, 1.15);
+  addBambooPlant(-0.6, 3.76, 1.0);
+  addBambooPlant(6.2, 3.76, 0.98);
+  addIkebana(1.8, 3.86, 0.82);
+  addUmbrellaStand(9.8, 3.7, 0.72, Math.PI);
   addNPC('maid','仲居','maid','yukata',4.6,1.2,Math.PI,npcInteract);
 }
 
@@ -1138,7 +1340,7 @@ function buildRoom201(){
   const alcove = new THREE.Mesh(new THREE.BoxGeometry(1.6,2.5,0.4), materials.darkWood); alcove.position.set(-3.2,1.25,-3.6); areaGroup.add(alcove); addBoxCollider(-3.2,-3.6,1.6,0.4);
   const futon = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.26,3.0), new THREE.MeshStandardMaterial({ color: 0xf1efe8, roughness: 1 })); futon.position.set(1.7,0.03,-1.2); areaGroup.add(futon); addBoxCollider(1.7,-1.2,2.2,3.0);
   const table = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.38,1.2), materials.darkWood); table.position.set(-0.2,0.19,0.8); areaGroup.add(table); addBoxCollider(-0.2,0.8,1.2,1.2);
-  addLamp(0,0,0.8); addDoor('room201ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:0,z:-1.8,yaw:0},null,0xf0e7d1);
+  addLamp(0,0,0.8); addDoor('room201ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:0,z:-1.8,yaw:0},null,0xf0e7d1,{style:'fusuma'});
   addBackdropPlane(realismAssets.roomA, 0, 1.65, -4.1, 7.6, 3.3, 0, 0.7);
   addTeaSet(-0.18, 0.82, 1.0);
   addAndonLamp(-3.78, 2.92, 0.62);
@@ -1155,7 +1357,7 @@ function buildRoom202(){
   const futon = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.26,2.8), new THREE.MeshStandardMaterial({ color: 0xf1efe8, roughness: 1 })); futon.position.set(1.7,0.03,-0.6); areaGroup.add(futon); addBoxCollider(1.7,-0.6,2.4,2.8);
   const table = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.38,1.0), materials.darkWood); table.position.set(-0.4,0.19,1.0); areaGroup.add(table); addBoxCollider(-0.4,1.0,1.3,1.0);
   addLamp(0,0,0.8);
-  addDoor('room202ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:4.8,z:-1.2,yaw:0},null,0xeadfcb);
+  addDoor('room202ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:4.8,z:-1.2,yaw:0},null,0xeadfcb,{style:'fusuma'});
   addBackdropPlane(realismAssets.roomB, 0, 1.7, -4.1, 7.6, 3.4, 0, 0.74);
   addTeaSet(-0.4, 1.0, 1.0);
   addIkebana(-3.6, 2.85, 0.72);
@@ -1165,61 +1367,87 @@ function buildRoom202(){
 function buildBath(){
   createFloor(15, 8, materials.tile, -0.1);
   createCeiling(15, 8, 0xe9ecef);
-  wallSegment(0,-3.95,15,3.2,0.14,materials.wallRose);
-  wallSegment(0,3.95,15,3.2,0.14,materials.wallRose);
-  wallSegment(-7.45,0,0.14,3.2,8,materials.wallRose);
-  wallSegment(7.45,0,0.14,3.2,8,materials.wallRose);
-  bathCurtain();
+  wallSegment(0,-3.95,15,3.2,0.14,materials.wallWarm);
+  wallSegment(0,3.95,15,3.2,0.14,materials.wallWarm);
+  wallSegment(-7.45,0,0.14,3.2,8,materials.wallWarm);
+  wallSegment(7.45,0,0.14,3.2,8,materials.wallWarm);
 
-  const bench = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.42,0.6), materials.darkWood); bench.position.set(0.8,0.21,2.8); areaGroup.add(bench); addBoxCollider(0.8,2.8,2.2,0.6);
-  const shelfBody = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.4,0.42), materials.darkWood); shelfBody.position.set(1.1,0.7,2.45); shelfBody.castShadow = shelfBody.receiveShadow = true; areaGroup.add(shelfBody); addBoxCollider(1.1,2.45,1.5,0.42);
-  for (const sy of [0.48,0.94]) { const plank = new THREE.Mesh(new THREE.BoxGeometry(1.44,0.05,0.5), materials.wood); plank.position.set(1.1,sy,2.45); areaGroup.add(plank); }
-  for (const [tx,ty,tz] of [[0.7,1.15,2.47],[1.1,1.15,2.47],[1.5,1.15,2.47],[0.8,0.69,2.47],[1.2,0.69,2.47],[1.6,0.69,2.47]]) { const towel = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.24), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })); towel.position.set(tx,ty,tz); areaGroup.add(towel); }
-  if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',1.1,2.45, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
+  const runner = new THREE.Mesh(new THREE.BoxGeometry(6.2,0.03,3.2), new THREE.MeshStandardMaterial({ color: 0xd7d1c3, roughness: 1 }));
+  runner.position.set(-2.2,-0.085,0); runner.receiveShadow = true; areaGroup.add(runner);
+  addDoor('bathToCorridor','戻る',-6.85,0,1.25,'corridor',{x:6.2,z:1.8,yaw:Math.PI},'x',0xddeff3,{style:'noren', clothColor:0x5b3e2d, signText:'暖簾口'});
 
-  addLamp(-3.6,0,0.7,0xffe6bc); addLamp(0.4,0,0.7,0xffe6bc); addLamp(4.9,0,0.58,0xffe6bc);
-  addDoor('bathToCorridor','客室廊下',-6.85,0,1.2,'corridor',{x:6.2,z:1.8,yaw:Math.PI},'x',0xddeff3);
-  const phoneTable = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.52,0.58), materials.darkWood); phoneTable.position.set(-0.4,0.26,-2.5); areaGroup.add(phoneTable); addBoxCollider(-0.4,-2.5,0.9,0.58);
-  const phone = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.14,0.32), materials.black); phone.position.set(-0.4,0.61,-2.5); areaGroup.add(phone);
-  addItem('phone','黒電話',-0.4,-2.5, phone, itemInteract);
+  const slatMat = new THREE.MeshStandardMaterial({ color: 0x8a6b4b, roughness: 1 });
+  const frontDesk = new THREE.Group();
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(2.8,0.9,0.78), new THREE.MeshStandardMaterial({ color: 0x6e4a32, roughness: 0.9 }));
+  desk.position.set(0,0.45,0);
+  frontDesk.add(desk);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(3.0,0.08,0.86), materials.darkWood); top.position.set(0,0.9,0); frontDesk.add(top);
+  frontDesk.position.set(-1.05,0,2.95);
+  frontDesk.traverse(m=>{ if(m.isMesh){ m.castShadow = m.receiveShadow = true; }});
+  areaGroup.add(frontDesk); addBoxCollider(-1.05,2.95,3.0,0.86);
 
-  wallSegment(2.2,-2.35,0.14,3.2,3.0,materials.wallRose);
-  wallSegment(2.2,2.6,0.14,3.2,2.1,materials.wallRose);
-  const toiletLintel = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.36,2.0), materials.darkWood); toiletLintel.position.set(2.2,2.82,0.25); areaGroup.add(toiletLintel);
-  const toiletSign = makeLabelPlane('トイレ', 0.9, 0.24); toiletSign.position.set(2.28,2.55,0.25); toiletSign.rotation.y = -Math.PI / 2; areaGroup.add(toiletSign);
+  const slatWall = new THREE.Group();
+  const backPanel = new THREE.Mesh(new THREE.BoxGeometry(4.8,2.4,0.14), new THREE.MeshStandardMaterial({ color: 0xcfb595, roughness: 1 }));
+  backPanel.position.set(0,1.2,0); slatWall.add(backPanel);
+  for (let i=-7; i<=7; i++) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.08,2.2,0.08), slatMat);
+    slat.position.set(i*0.28,1.18,0.08); slatWall.add(slat);
+  }
+  const topBeam = new THREE.Mesh(new THREE.BoxGeometry(5.2,0.24,0.24), materials.darkWood); topBeam.position.set(0,2.52,0); slatWall.add(topBeam);
+  slatWall.position.set(-1.05,0,3.24);
+  slatWall.traverse(m=>{ if(m.isMesh){ m.castShadow = m.receiveShadow = true; }});
+  areaGroup.add(slatWall);
+
+  norenDoorModel(-3.45, 2.85, null, '女湯', { clothColor:0x7a463b, subLabel:'WOMEN', blocked:true, cleanText:'清掃中' });
+  norenDoorModel(1.45, 2.85, null, '男湯', { clothColor:0x2f3b45, subLabel:'MEN' });
+
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.42,0.6), materials.darkWood); bench.position.set(0.95,0.21,1.95); areaGroup.add(bench); addBoxCollider(0.95,1.95,2.2,0.6);
+  const shelfBody = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.4,0.42), materials.darkWood); shelfBody.position.set(4.9,0.7,2.45); shelfBody.castShadow = shelfBody.receiveShadow = true; areaGroup.add(shelfBody); addBoxCollider(4.9,2.45,1.5,0.42);
+  for (const sy of [0.48,0.94]) { const plank = new THREE.Mesh(new THREE.BoxGeometry(1.44,0.05,0.5), materials.wood); plank.position.set(4.9,sy,2.45); areaGroup.add(plank); }
+  for (const [tx,ty,tz] of [[4.5,1.15,2.47],[4.9,1.15,2.47],[5.3,1.15,2.47],[4.6,0.69,2.47],[5.0,0.69,2.47],[5.4,0.69,2.47]]) { const towel = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.24), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })); towel.position.set(tx,ty,tz); areaGroup.add(towel); }
+  if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',4.9,2.45, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
+
+  addLamp(-4.7,0.2,0.55,0xffe6bc); addLamp(-1.0,0.2,0.55,0xffe6bc); addLamp(3.1,0.2,0.52,0xffe6bc);
+  const phoneTable = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.52,0.58), materials.darkWood); phoneTable.position.set(2.55,0.26,-2.35); areaGroup.add(phoneTable); addBoxCollider(2.55,-2.35,0.9,0.58);
+  const phone = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.14,0.32), materials.black); phone.position.set(2.55,0.61,-2.35); areaGroup.add(phone);
+  addItem('phone','黒電話',2.55,-2.35, phone, itemInteract);
+
+  wallSegment(4.25,-2.35,0.14,3.2,3.0,materials.wallWarm);
+  wallSegment(4.25,2.6,0.14,3.2,2.1,materials.wallWarm);
+  const toiletLintel = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.36,2.0), materials.darkWood); toiletLintel.position.set(4.25,2.82,0.25); areaGroup.add(toiletLintel);
+  const toiletSign = makeTextPlane('トイレ', 0.9, 0.22, { fg:'#f2ecdf', bg:'rgba(14,10,8,.4)', fontSize:84 }); toiletSign.position.set(4.33,2.55,0.25); toiletSign.rotation.y = -Math.PI / 2; areaGroup.add(toiletSign);
 
   const toiletFloor = new THREE.Mesh(new THREE.BoxGeometry(5.0,0.03,6.8), new THREE.MeshStandardMaterial({ color: 0xd9d9d7, roughness: 1 }));
-  toiletFloor.position.set(4.85,-0.085,0.2); toiletFloor.receiveShadow = true; areaGroup.add(toiletFloor);
-
-  const stallBack = new THREE.Mesh(new THREE.BoxGeometry(4.8,2.2,0.14), materials.wallWarm); stallBack.position.set(4.85,1.1,3.15); areaGroup.add(stallBack); addBoxCollider(4.85,3.15,4.8,0.14);
-  const stallLeft = new THREE.Mesh(new THREE.BoxGeometry(0.14,2.2,2.5), materials.wallWarm); stallLeft.position.set(2.55,1.1,1.95); areaGroup.add(stallLeft); addBoxCollider(2.55,1.95,0.14,2.5);
-  const stallRight = stallLeft.clone(); stallRight.position.x = 7.15; areaGroup.add(stallRight); addBoxCollider(7.15,1.95,0.14,2.5);
-  const stallDivider = stallLeft.clone(); stallDivider.position.set(5.0,1.1,1.95); areaGroup.add(stallDivider); addBoxCollider(5.0,1.95,0.14,2.5);
+  toiletFloor.position.set(6.9,-0.085,0.2); toiletFloor.receiveShadow = true; areaGroup.add(toiletFloor);
+  const stallBack = new THREE.Mesh(new THREE.BoxGeometry(4.8,2.2,0.14), materials.wallWarm); stallBack.position.set(6.9,1.1,3.15); areaGroup.add(stallBack); addBoxCollider(6.9,3.15,4.8,0.14);
+  const stallLeft = new THREE.Mesh(new THREE.BoxGeometry(0.14,2.2,2.5), materials.wallWarm); stallLeft.position.set(4.6,1.1,1.95); areaGroup.add(stallLeft); addBoxCollider(4.6,1.95,0.14,2.5);
+  const stallRight = stallLeft.clone(); stallRight.position.x = 9.2; areaGroup.add(stallRight); addBoxCollider(9.2,1.95,0.14,2.5);
+  const stallDivider = stallLeft.clone(); stallDivider.position.set(7.05,1.1,1.95); areaGroup.add(stallDivider); addBoxCollider(7.05,1.95,0.14,2.5);
 
   if (state.questFlags.toiletStallOpened) {
-    addOpenedToiletStallDoor(2.95, 0.26);
+    addOpenedToiletStallDoor(5.0, 0.26);
   } else {
     const stallDoorL = makeToiletStallDoorMesh();
     stallDoorL.position.y = 0.95;
-    addItem('toiletStallDoor','手前個室の扉',3.85,0.8, stallDoorL, itemInteract);
+    addItem('toiletStallDoor','手前個室の扉',5.9,0.8, stallDoorL, itemInteract);
   }
-  const stallDoorR = makeToiletStallDoorMesh(); stallDoorR.position.set(6.05,0.95,0.8); areaGroup.add(stallDoorR);
+  const stallDoorR = makeToiletStallDoorMesh(); stallDoorR.position.set(8.1,0.95,0.8); areaGroup.add(stallDoorR);
 
   const toiletA = new THREE.Group();
   const bowlA = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.34,0.58,18), materials.paper); bowlA.position.set(0,0.29,0); bowlA.castShadow = bowlA.receiveShadow = true; toiletA.add(bowlA);
   const tankA = new THREE.Mesh(new THREE.BoxGeometry(0.45,0.5,0.24), materials.paper); tankA.position.set(0,0.73,-0.18); toiletA.add(tankA);
-  toiletA.position.set(3.85,0,2.35); areaGroup.add(toiletA); addBoxCollider(3.85,2.35,0.9,0.9);
-
-  const toiletB = toiletA.clone(); toiletB.position.set(6.05,0,2.35); areaGroup.add(toiletB); addBoxCollider(6.05,2.35,0.9,0.9);
-  const sinkBase = new THREE.Mesh(new THREE.BoxGeometry(1.0,0.86,0.5), materials.paper); sinkBase.position.set(6.2,0.43,-2.2); areaGroup.add(sinkBase); addBoxCollider(6.2,-2.2,1.0,0.5);
-  const mirror = new THREE.Mesh(new THREE.BoxGeometry(1.1,1.4,0.06), new THREE.MeshStandardMaterial({ color: 0xc3d4e2, roughness: 0.2, metalness: 0.1 })); mirror.position.set(6.2,1.45,-2.6); areaGroup.add(mirror);
-  addAndonLamp(-5.85, -2.92, 0.72);
-  addUmbrellaStand(6.95, 3.25, 0.56, Math.PI);
-  const basket1 = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.22,14), new THREE.MeshStandardMaterial({ color: 0x9e825d, roughness: 0.92 })); basket1.position.set(-1.15,0.12,2.35); basket1.castShadow = basket1.receiveShadow = true; areaGroup.add(basket1);
-  const basket2 = basket1.clone(); basket2.position.x = -1.75; areaGroup.add(basket2);
+  toiletA.position.set(5.9,0,2.35); areaGroup.add(toiletA); addBoxCollider(5.9,2.35,0.9,0.9);
+  const toiletB = toiletA.clone(); toiletB.position.set(8.1,0,2.35); areaGroup.add(toiletB); addBoxCollider(8.1,2.35,0.9,0.9);
+  const sinkBase = new THREE.Mesh(new THREE.BoxGeometry(1.0,0.86,0.5), materials.paper); sinkBase.position.set(8.25,0.43,-2.2); areaGroup.add(sinkBase); addBoxCollider(8.25,-2.2,1.0,0.5);
+  const mirror = new THREE.Mesh(new THREE.BoxGeometry(1.1,1.4,0.06), new THREE.MeshStandardMaterial({ color: 0xc3d4e2, roughness: 0.2, metalness: 0.1 })); mirror.position.set(8.25,1.45,-2.6); areaGroup.add(mirror);
+  addAndonLamp(3.9, -2.92, 0.72);
+  addUmbrellaStand(1.0, -2.85, 0.56, Math.PI);
+  addBambooPlant(-5.55, 2.72, 1.0);
+  const basket1 = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.22,14), new THREE.MeshStandardMaterial({ color: 0x9e825d, roughness: 0.92 })); basket1.position.set(0.15,0.12,1.68); basket1.castShadow = basket1.receiveShadow = true; areaGroup.add(basket1);
+  const basket2 = basket1.clone(); basket2.position.x = -0.45; areaGroup.add(basket2);
 
   if (state.questFlags.toiletStallOpened) {
-    addNPC('toiletGuest','しゃがみ客','guest','crouch',4.1,1.42,0,function(){
+    addNPC('toiletGuest','しゃがみ客','guest','crouch',6.15,1.42,0,function(){
       showDialogue([['しゃがみ客','……今は話しかけないでくれ。','guest']], ()=>{});
     });
   }
@@ -1320,8 +1548,8 @@ function itemInteract(entity){
     dynamicGroup.remove(entity.mesh);
     removeItem(entity.id);
     state.questFlags.toiletStallOpened = true;
-    addOpenedToiletStallDoor(2.95, 0.26);
-    addNPC('toiletGuest','しゃがみ客','guest','crouch',4.1,1.42,0,function(){
+    addOpenedToiletStallDoor(5.0, 0.26);
+    addNPC('toiletGuest','しゃがみ客','guest','crouch',6.15,1.42,0,function(){
       showDialogue([['しゃがみ客','……今は話しかけないでくれ。','guest']], ()=>{});
     });
     showDialogue([['あなた','ACTで手前の個室を開けた。','hero'], ['しゃがみ客','……っ。誰かいる。', 'guest']], ()=>{});
