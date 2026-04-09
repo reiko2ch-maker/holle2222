@@ -942,7 +942,6 @@ function buildLobby(){
 }
 
 function buildKitchen(){
-function buildKitchen(){
   createFloor(11, 9, materials.tile, -0.1);
   createCeiling(11, 9, 0xece7dd);
   wallSegment(0,-4.45,11,3.2,0.14,materials.wallDark); wallSegment(0,4.45,11,3.2,0.14,materials.wallDark); wallSegment(-5.45,0,0.14,3.2,9,materials.wallDark); wallSegment(5.45,0,0.14,3.2,9,materials.wallDark);
@@ -1802,6 +1801,23 @@ function beginNewGame(){
   setStep('start_note');
 }
 
+
+
+function showFatalDebug(message){
+  let box = document.getElementById('fatal-debug');
+  if(!box){
+    box = document.createElement('div');
+    box.id='fatal-debug';
+    box.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;padding:12px 14px;border-radius:14px;background:rgba(80,0,0,.92);color:#fff;font:14px/1.5 sans-serif;white-space:pre-wrap';
+    document.body.appendChild(box);
+  }
+  box.textContent = message;
+}
+
+window.addEventListener('error', function(e){
+  showFatalDebug('runtime error: ' + (e.message || 'unknown') + '\n' + (e.filename || '') + ':' + (e.lineno || 0));
+});
+
 function init(){
   setupControls();
   const params = new URLSearchParams(location.search);
@@ -1819,18 +1835,10 @@ function init(){
   requestAnimationFrame(animate);
 }
 
-init();
-
-
-window.addEventListener('error', function(e){
-  let box = document.getElementById('fatal-debug');
-  if(!box){
-    box = document.createElement('div');
-    box.id='fatal-debug';
-    box.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;padding:12px 14px;border-radius:14px;background:rgba(80,0,0,.92);color:#fff;font:14px/1.5 sans-serif;white-space:pre-wrap';
-    document.body.appendChild(box);
-  }
-  box.textContent = 'runtime error: ' + (e.message || 'unknown') + '\n' + (e.filename || '') + ':' + (e.lineno || 0);
-});
+try {
+  init();
+} catch (e) {
+  console.error(e);
+  showFatalDebug('init error: ' + (e && e.message ? e.message : String(e)));
 }
 })();
