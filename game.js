@@ -160,7 +160,7 @@ const stepDefs = {
   get_tray: { day: 1, phase: '昼勤務', text: '厨房でお茶の盆を受け取る', sub: '厨房へ', targetArea: 'kitchen', targetPos: { x: 0, z: -1 }, trigger: { type: 'item', id: 'tray' } },
   deliver_201: { day: 1, phase: '昼勤務', text: '201号室の客にお茶を届ける', sub: '201号室へ', targetArea: 'room201', targetPos: { x: 0, z: -1.8 }, trigger: { type: 'npc', id: 'guest201' } },
   report_okami: { day: 1, phase: '昼勤務', text: '帳場へ戻って女将に報告する', sub: '帳場へ', targetArea: 'lobby', targetPos: { x: 0, z: -2 }, trigger: { type: 'npc', id: 'okami' } },
-  stock_amenities: { day: 1, phase: '昼勤務', text: '帳場横の戸棚から客用備品袋を受け取る', sub: '帳場の戸棚へ', targetArea: 'lobby', targetPos: { x: -5.6, z: 4.2 }, trigger: { type: 'item', id: 'amenityBag' } },
+  stock_amenities: { day: 1, phase: '昼勤務', text: '帳場横の戸棚から客用備品袋を受け取る', sub: '帳場の戸棚へ', targetArea: 'lobby', targetPos: { x: -5.95, z: 4.95 }, trigger: { type: 'item', id: 'amenityBag' } },
   place_amenities: { day: 1, phase: '昼勤務', text: '客室廊下の備品箱へ客用備品を補充する', sub: '客室廊下へ', targetArea: 'corridor', targetPos: { x: -6.3, z: 2.4 }, trigger: { type: 'item', id: 'amenityBox' } },
   arrange_slippers: { day: 1, phase: '昼勤務', text: '客室廊下入口の下駄箱前でスリッパを揃える', sub: '客室廊下へ', targetArea: 'corridor', targetPos: { x: -9.4, z: -3.2 }, trigger: { type: 'item', id: 'slipperRack' } },
   restock_towels: { day: 1, phase: '昼勤務', text: '浴場前の棚に替えタオルを補充する', sub: '浴場前へ', targetArea: 'bath', targetPos: { x: 2.5, z: 2.6 }, trigger: { type: 'item', id: 'towelShelf' } },
@@ -690,29 +690,31 @@ function maybeStartLobbyArrivalCutscene(entryDoorId){
   if (!(state.step === 'talk_okami' || state.step === 'walk_to_ryokan')) return;
   const okami = npcs.find(n => n.id === 'okami');
   if (!okami) return;
-  const sx = -7.08, sz = 2.72, mx = -2.2, mz = 1.25, ex = 0, ez = -3.0;
-  okami.group.position.set(sx, 0, sz); okami.x = sx; okami.z = sz; okami.rot = -0.1;
+  const sx = -6.42, sz = 3.55, mx = -3.15, mz = 1.85, ex = 0.0, ez = -3.05;
+  okami.group.position.set(sx, 0, sz); okami.x = sx; okami.z = sz; okami.rot = -0.05;
   const yawForward = 0;
-  const yawSideDoor = 0.96;
+  const yawSideDoor = 0.88;
   const yawDesk = Math.PI;
   startCutscene([
     {
-      duration: 0.32,
+      duration: 0.48,
       onStart(){
         player.yaw = yawForward;
-        player.pitch = -0.05;
+        player.pitch = -0.035;
       },
       onUpdate(t){
         player.yaw = lerpAngle(player.yaw, yawForward, easeInOut(t));
-        player.pitch = lerp(player.pitch, -0.04, t);
+        player.pitch = lerp(player.pitch, -0.03, t);
       }
     },
     {
-      duration: 0.42,
-      onUpdate(t){ player.yaw = lerpAngle(player.yaw, yawSideDoor, easeInOut(t)); }
+      duration: 0.36,
+      onUpdate(t){
+        player.yaw = lerpAngle(player.yaw, yawSideDoor, easeInOut(t));
+      }
     },
     {
-      duration: 1.05,
+      duration: 1.15,
       onUpdate(t){
         const e = easeInOut(t);
         okami.group.position.x = lerp(sx, mx, e);
@@ -721,12 +723,12 @@ function maybeStartLobbyArrivalCutscene(entryDoorId){
         okami.z = okami.group.position.z;
         const dx = okami.group.position.x - player.x;
         const dz = okami.group.position.z - player.z;
-        player.yaw = lerpAngle(player.yaw, Math.atan2(-dx, -dz), 0.08);
+        player.yaw = lerpAngle(player.yaw, Math.atan2(-dx, -dz), 0.09);
         okami.rot = Math.atan2(mx - okami.group.position.x, mz - okami.group.position.z);
       }
     },
     {
-      duration: 1.55,
+      duration: 1.72,
       onUpdate(t){
         const e = easeInOut(t);
         okami.group.position.x = lerp(mx, ex, e);
@@ -735,13 +737,16 @@ function maybeStartLobbyArrivalCutscene(entryDoorId){
         okami.z = okami.group.position.z;
         const dx = okami.group.position.x - player.x;
         const dz = okami.group.position.z - player.z;
-        player.yaw = lerpAngle(player.yaw, Math.atan2(-dx, -dz), 0.07);
+        player.yaw = lerpAngle(player.yaw, Math.atan2(-dx, -dz), 0.08);
         okami.rot = Math.atan2(ex - okami.group.position.x, ez - okami.group.position.z);
       },
-      onEnd(){ okami.rot = Math.PI; }
+      onEnd(){
+        okami.group.position.set(ex, 0, ez);
+        okami.x = ex; okami.z = ez; okami.rot = Math.PI;
+      }
     },
     {
-      duration: 0.65,
+      duration: 0.6,
       onUpdate(t){
         player.yaw = lerpAngle(player.yaw, yawDesk, easeInOut(t));
         player.pitch = lerp(player.pitch, -0.02, t);
@@ -990,45 +995,53 @@ function addShojiWallSpan(x, z, w, opts={}){
   areaGroup.add(g);
   return g;
 }
-function fusumaDoorModel(x, z, axis, label){
+function fusumaDoorModel(x, z, axis, label, opts={}){
   const g = new THREE.Group();
-  const frameW = 1.66;
+  const frameW = 1.7;
   const frameH = 2.34;
-  const postL = new THREE.Mesh(new THREE.BoxGeometry(0.1, frameH, 0.18), materials.darkWood);
+  const pocket = new THREE.Mesh(
+    new THREE.BoxGeometry(frameW + 0.08, frameH + 0.08, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x34271d, roughness: 1, transparent: true, opacity: 0.92 })
+  );
+  pocket.position.set(0, frameH/2, -0.03);
+  g.add(pocket);
+  const postL = new THREE.Mesh(new THREE.BoxGeometry(0.1, frameH, 0.12), materials.darkWood);
   const postR = postL.clone();
   postL.position.set(-frameW/2, frameH/2, 0); postR.position.set(frameW/2, frameH/2, 0);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(frameW + 0.1, 0.12, 0.18), materials.darkWood);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(frameW + 0.1, 0.12, 0.12), materials.darkWood);
   top.position.set(0, frameH - 0.06, 0);
-  const sill = new THREE.Mesh(new THREE.BoxGeometry(frameW + 0.04, 0.08, 0.18), materials.darkWood);
-  sill.position.set(0, 0.04, 0);
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(frameW + 0.02, 0.06, 0.12), materials.darkWood);
+  sill.position.set(0, 0.03, 0);
   g.add(postL, postR, top, sill);
   const panelMat = new THREE.MeshStandardMaterial({ color: 0xf0e6d6, roughness: 1 });
-  const left = new THREE.Mesh(new THREE.BoxGeometry(0.72, 2.02, 0.06), panelMat);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.72, 2.02, 0.04), panelMat);
   const right = left.clone();
-  left.position.set(-0.35, 1.05, 0.01); right.position.set(0.35, 1.05, -0.01);
+  left.position.set(-0.35, 1.05, 0.005); right.position.set(0.35, 1.05, -0.005);
   g.add(left, right);
   for (const panel of [left, right]) {
     const bars = new THREE.Group();
     for (let i = -1; i <= 1; i++) {
-      const v = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.82, 0.025), materials.darkWood);
-      v.position.set(i*0.18, 1.05, 0.04);
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.035, 1.82, 0.018), materials.darkWood);
+      v.position.set(i*0.18, 1.05, 0.03);
       bars.add(v);
     }
     for (let y of [0.42, 0.96, 1.48]) {
-      const h = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.04, 0.025), materials.darkWood);
-      h.position.set(0, y, 0.04);
+      const h = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.035, 0.018), materials.darkWood);
+      h.position.set(0, y, 0.03);
       bars.add(h);
     }
     bars.position.x = panel.position.x;
     g.add(bars);
-    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 10), materials.brass);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 10), materials.brass);
     handle.rotation.z = Math.PI / 2;
-    handle.position.set(panel.position.x > 0 ? 0.08 : -0.08, 1.02, 0.05);
+    handle.position.set(panel.position.x > 0 ? 0.08 : -0.08, 1.02, 0.04);
     g.add(handle);
   }
-  const sign = makeTextPlane(label || '客室', 0.7, 0.18, { fg: '#f5efe4', bg: 'rgba(0,0,0,.35)', fontSize: 76 });
-  sign.position.set(0, 2.62, 0.03);
-  g.add(sign);
+  const signBase = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.16, 0.035), materials.darkWood);
+  signBase.position.set(0, 2.52, 0.02);
+  const sign = makeTextPlane(label || '客室', 0.72, 0.14, { fg: '#f5efe4', bg: 'rgba(0,0,0,0)', fontSize: 74 });
+  sign.position.set(0, 2.52, 0.04);
+  g.add(signBase, sign);
   if (axis === 'x') g.rotation.y = Math.PI/2;
   g.position.set(x,0,z);
   g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
@@ -1040,30 +1053,36 @@ function norenDoorModel(x, z, axis, label, opts={}){
   const width = opts.width || 1.72;
   const height = opts.height || 2.18;
   const clothColor = opts.clothColor || 0x203d5a;
-  const postL = new THREE.Mesh(new THREE.BoxGeometry(0.1, height + 0.12, 0.16), materials.darkWood);
+  const pocket = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 0.12, height + 0.24, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x3a2d21, roughness: 1, transparent: true, opacity: 0.9 })
+  );
+  pocket.position.set(0, (height+0.08)/2, -0.03);
+  g.add(pocket);
+  const postL = new THREE.Mesh(new THREE.BoxGeometry(0.08, height + 0.12, 0.12), materials.darkWood);
   const postR = postL.clone();
   postL.position.set(-width/2, (height+0.12)/2, 0);
   postR.position.set(width/2, (height+0.12)/2, 0);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(width + 0.1, 0.12, 0.16), materials.darkWood);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(width + 0.08, 0.12, 0.12), materials.darkWood);
   top.position.set(0, height + 0.06, 0);
   g.add(postL, postR, top);
   const clothMat = new THREE.MeshStandardMaterial({ color: clothColor, roughness: 1, side: THREE.DoubleSide });
   for (let i = 0; i < 2; i++) {
     const cloth = new THREE.Mesh(new THREE.PlaneGeometry(width*0.46, 1.55), clothMat);
-    cloth.position.set(i === 0 ? -width*0.24 : width*0.24, 1.5, 0.04);
+    cloth.position.set(i === 0 ? -width*0.24 : width*0.24, 1.5, 0.03);
     g.add(cloth);
   }
-  const text = makeTextPlane(label || '暖簾', 0.9, 0.28, { fg: '#f8f4ea', fontSize: 110 });
-  text.position.set(0, 1.55, 0.05);
+  const text = makeTextPlane(label || '暖簾', 0.88, 0.26, { fg: '#f8f4ea', fontSize: 104 });
+  text.position.set(0, 1.55, 0.04);
   g.add(text);
   if (opts.subLabel) {
-    const sub = makeTextPlane(opts.subLabel, 0.85, 0.16, { fg: '#f1ebdc', fontSize: 56 });
-    sub.position.set(0, 0.56, 0.05);
+    const sub = makeTextPlane(opts.subLabel, 0.8, 0.14, { fg: '#f1ebdc', fontSize: 54 });
+    sub.position.set(0, 0.56, 0.04);
     g.add(sub);
   }
   if (opts.blocked) {
     const stand = makeCleaningSign(0.8, 0.54, opts.cleanText || '清掃中');
-    stand.position.set(0,0,0.52);
+    stand.position.set(0,0,0.48);
     g.add(stand);
   }
   if (axis === 'x') g.rotation.y = Math.PI/2;
@@ -1198,28 +1217,38 @@ function addMoodLight(x, y, z, color=0xffd8a8, intensity=0.35, distance=5.5){
   return p;
 }
 function doorModel(x,z,axis,label,color,opts={}){
-  if (opts.style === 'fusuma') return fusumaDoorModel(x, z, axis, label);
+  if (opts.style === 'fusuma') return fusumaDoorModel(x, z, axis, label, opts);
   if (opts.style === 'noren') return norenDoorModel(x, z, axis, opts.signText || label, opts);
   const g = new THREE.Group();
+  const panelColor = color || 0xe8dcc2;
+  const surround = new THREE.Mesh(
+    new THREE.BoxGeometry(1.72, 2.48, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x3a2d21, roughness: 1, transparent: true, opacity: 0.92 })
+  );
+  surround.position.set(0, 1.2, -0.03);
+  const shadowPocket = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.48, 2.16),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12, depthWrite: false })
+  );
+  shadowPocket.position.set(0, 1.1, -0.01);
   const frameMat = materials.darkWood;
-  const panelMat = new THREE.MeshStandardMaterial({ color: color || 0xe8dcc2, roughness: 0.95 });
-  const signMat = new THREE.MeshStandardMaterial({ color: 0x1a100d, roughness: 1 });
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.9, 0.05), signMat);
-  const signText = makeLabelPlane(label || '扉', 1.0, 0.3);
-  signText.position.set(0, 0, 0.03);
-  sign.add(signText);
-  const left = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.3, 0.18), frameMat);
+  const panelMat = new THREE.MeshStandardMaterial({ color: panelColor, roughness: 0.96 });
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.28, 0.12), frameMat);
   const right = left.clone();
-  const top = new THREE.Mesh(new THREE.BoxGeometry(1.54, 0.12, 0.18), frameMat);
-  left.position.set(-0.73, 1.15, 0); right.position.set(0.73, 1.15, 0); top.position.set(0, 2.24, 0);
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(1.34, 2.08, 0.12), panelMat);
-  panel.position.set(0, 1.04, 0);
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12), materials.brass);
-  knob.position.set(0.52, 1.08, 0.09);
-  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.34, 0.04), new THREE.MeshStandardMaterial({ color: 0x2d2d31, roughness: 0.5 }));
-  plate.position.set(0.52, 1.08, 0.06);
-  sign.position.set(0, 2.8, 0.03);
-  g.add(left,right,top,panel,plate,knob,sign);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.12, 0.12), frameMat);
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(1.44, 0.05, 0.12), frameMat);
+  left.position.set(-0.71, 1.14, 0); right.position.set(0.71, 1.14, 0); top.position.set(0, 2.22, 0); sill.position.set(0, 0.03, 0);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(1.28, 2.04, 0.05), panelMat);
+  panel.position.set(0, 1.03, 0.01);
+  const handlePlate = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 0.016), new THREE.MeshStandardMaterial({ color: 0x292a2f, roughness: 0.55 }));
+  handlePlate.position.set(0.49, 1.06, 0.045);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), materials.brass);
+  knob.position.set(0.49, 1.06, 0.065);
+  const signBase = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.22, 0.04), materials.darkWood);
+  signBase.position.set(0, 2.52, 0.02);
+  const signText = makeTextPlane(label || '扉', 0.82, 0.16, { fg:'#f4eee1', bg:'rgba(0,0,0,0)', fontSize: 78 });
+  signText.position.set(0, 2.52, 0.045);
+  g.add(surround, shadowPocket, left, right, top, sill, panel, handlePlate, knob, signBase, signText);
   if (axis === 'x') g.rotation.y = Math.PI / 2;
   g.position.set(x,0,z);
   g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
@@ -1662,7 +1691,7 @@ function buildTown(){
   }
 
   addDoor('townToHome','自宅',-9.1,0,1.2,'home',{x:3.4,z:1.0,yaw:Math.PI/2},'x',0xc4c0b5);
-  addDoor('townToLobby','旅館入口',9.15,0,2.1,'lobby',{x:0,z:4.8,yaw:0},'x',0xc9b07a);
+  addDoor('townToLobby','旅館入口',9.42,0,2.0,'lobby',{x:0,z:5.45,yaw:0},'x',0xc9b07a);
   addBackdropPlane(realismAssets.exterior, 0, 4.4, -15.5, 18, 8.5, 0, 0.88);
   addNPC('villager','町の住民','villager','coat',-2.6,-1.2,Math.PI/2,npcInteract);
 }
@@ -1711,7 +1740,7 @@ function buildLobby(){
   const blackPhone = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.14,0.28), materials.black);
   blackPhone.position.set(2.2,1.36,-4.35); areaGroup.add(blackPhone);
   const amenityCab = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.4,0.46), new THREE.MeshStandardMaterial({ color: 0x8f7555, roughness: 0.9 })); amenityCab.position.y = 1.28;
-  if (state.step === 'stock_amenities') addItem('amenityBag','客用備品袋',-5.2,3.42, amenityCab, itemInteract);
+  if (state.step === 'stock_amenities') addItem('amenityBag','客用備品袋',-5.95,4.95, amenityCab, itemInteract);
   const registerBook = new THREE.Mesh(new THREE.BoxGeometry(0.78,0.08,0.54), new THREE.MeshStandardMaterial({ color: 0x31546b, roughness: 0.82 }));
   registerBook.position.y = 1.36;
   if (state.step === 'inspect_register' || state.step === 'inspect_guestbook_203') addItem('registerBook','宿帳',1.1,-4.25, registerBook, itemInteract);
@@ -1731,16 +1760,16 @@ function buildLobby(){
   addIkebana(-5.95, 4.15, 0.9);
   addAndonLamp(5.85, 5.65, 0.82);
   addUmbrellaStand(-7.12, -5.6, 0.82, 0);
-  addTeaSet(1.85, -4.35, 1.0);
+  addTeaSet(3.25, -5.2, 0.92);
 
   addFramedPoster(posterAssets.missing, -7.82, 1.65, -0.9, 1.25, 1.75, Math.PI / 2);
   addFramedPoster(posterAssets.wanted, -7.82, 1.55, -3.25, 1.2, 1.65, Math.PI / 2);
   addFramedPoster(posterAssets.missing, 7.82, 1.6, 4.1, 1.15, 1.55, -Math.PI / 2);
 
-  addDoor('lobbyToCorridor', '客室廊下', 7.32, 0, 1.35, 'corridor', { x: -7.6, z: 0, yaw: 0 });
-  addDoor('lobbyToKitchen', '厨房', -7.32, 2.6, 1.2, 'kitchen', { x: 5.0, z: -1.2, yaw: Math.PI });
-  addDoor('lobbyToArchive', '宿帳庫', -7.32, -2.6, 1.2, 'archive', { x: 5.1, z: 0, yaw: Math.PI });
-  if (!state.questFlags.okamiArrivalSceneDone && (state.step === 'walk_to_ryokan' || state.step === 'talk_okami')) addNPC('okami', '女将', 'okami', 'suit', -7.08, 2.72, -0.15, npcInteract);
+  addDoor('lobbyToCorridor', '客室廊下', 7.84, 0, 1.35, 'corridor', { x: -7.15, z: 0, yaw: 0 }, 'x');
+  addDoor('lobbyToKitchen', '厨房', -7.84, 3.95, 1.15, 'kitchen', { x: 4.9, z: -1.6, yaw: Math.PI }, 'x');
+  addDoor('lobbyToArchive', '宿帳庫', -7.84, -3.95, 1.15, 'archive', { x: 4.95, z: 0, yaw: Math.PI }, 'x');
+  if (!state.questFlags.okamiArrivalSceneDone && (state.step === 'walk_to_ryokan' || state.step === 'talk_okami')) addNPC('okami', '女将', 'okami', 'suit', -6.42, 3.55, -0.12, npcInteract);
   else addNPC('okami', '女将', 'okami', 'suit', 0, -3.0, Math.PI, npcInteract);
 }
 
@@ -1751,7 +1780,7 @@ function buildKitchen(){
   const counter = new THREE.Mesh(new THREE.BoxGeometry(3.8,0.92,1.3), materials.darkWood); counter.position.set(0,0.46,-2.3); counter.castShadow = counter.receiveShadow = true; areaGroup.add(counter); addBoxCollider(0,-2.3,3.8,1.3);
   const stove = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.92,0.8), new THREE.MeshStandardMaterial({ color: 0x54565d, roughness: 0.5 })); stove.position.set(-3.7,0.46,2.5); areaGroup.add(stove); addBoxCollider(-3.7,2.5,1.6,0.8);
   addLamp(0,0,0.9); addLamp(3.2,-1.4,0.7);
-  addDoor('kitchenToLobby','帳場',5.0,-1.2,1.2,'lobby',{x:-4.8,z:2.2,yaw:0},'x');
+  addDoor('kitchenToLobby','帳場',5.34,-1.65,1.15,'lobby',{x:-6.85,z:3.55,yaw:0},'x');
   addNPC('chef','料理番','chef','tracksuit',1.8,-1.2,-Math.PI/2,npcInteract);
   const teaTray = new THREE.Mesh(new THREE.BoxGeometry(0.86,0.08,0.56), new THREE.MeshStandardMaterial({ color: 0x7a4e2f, roughness: 0.85 }));
   teaTray.position.y = 0.94;
@@ -1759,14 +1788,14 @@ function buildKitchen(){
   teapot.position.set(0.1,0.12,0); teaTray.add(teapot);
   const cup1 = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.08,18), materials.paper); cup1.position.set(-0.18,0.08,-0.1); teaTray.add(cup1);
   const cup2 = cup1.clone(); cup2.position.z = 0.1; teaTray.add(cup2);
-  addItem('tray','お茶の盆',0.2,-2.25,teaTray,itemInteract);
+  addItem('tray','お茶の盆',1.35,-2.2,teaTray,itemInteract);
 
   const breakfastTray = new THREE.Mesh(new THREE.BoxGeometry(1.0,0.08,0.66), new THREE.MeshStandardMaterial({ color: 0x77482b, roughness: 0.82 }));
   breakfastTray.position.y = 0.94;
   const rice = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.08,18), materials.paper); rice.position.set(-0.16,0.08,-0.08); breakfastTray.add(rice);
   const soup = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.14,0.12,18), new THREE.MeshStandardMaterial({ color: 0x6d3224, roughness: 0.85 })); soup.position.set(0.14,0.1,-0.08); breakfastTray.add(soup);
   const fish = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.05,0.12), new THREE.MeshStandardMaterial({ color: 0xcbaa64, roughness: 0.9 })); fish.position.set(-0.02,0.09,0.14); breakfastTray.add(fish);
-  if (state.step === 'get_breakfast202') addItem('breakfastTray','202号室の朝食膳',-1.55,-2.18,breakfastTray,itemInteract);
+  if (state.step === 'get_breakfast202') addItem('breakfastTray','202号室の朝食膳',-1.35,-2.18,breakfastTray,itemInteract);
 }
 
 function buildCorridor(){
@@ -1799,11 +1828,11 @@ function buildCorridor(){
   sideRailA.position.set(0,0.18,-4.22); sideRailA.castShadow = sideRailA.receiveShadow = true; areaGroup.add(sideRailA);
   const sideRailB = sideRailA.clone(); sideRailB.position.z = 4.22; areaGroup.add(sideRailB);
 
-  addDoor('corridorToLobby','帳場',-11.34,0,1.2,'lobby',{x:7.1,z:0,yaw:Math.PI},'x');
-  addDoor('corridorToNorth','北廊下',11.34,0,1.2,'north',{x:-3.7,z:0,yaw:0},'x',0xc3b28a);
-  addDoor('corridorTo201','201',0,-4.58,1.25,'room201',{x:0,z:4.0,yaw:Math.PI},null,0xf0e7d1,{style:'fusuma'});
-  addDoor('corridorTo202','202',4.8,-4.58,1.25,'room202',{x:0,z:4.0,yaw:Math.PI},null,0xeaddcd,{style:'fusuma'});
-  addDoor('corridorToBath','男湯',8.55,3.95,1.35,'bath',{x:-5.2,z:0,yaw:0},null,0xd7ecef,{style:'noren', clothColor:0x2a3f53, subLabel:'MEN'});
+  addDoor('corridorToLobby','帳場',-11.84,0,1.2,'lobby',{x:7.05,z:0,yaw:Math.PI},'x');
+  addDoor('corridorToNorth','北廊下',11.84,0,1.2,'north',{x:-3.75,z:0,yaw:0},'x',0xc3b28a);
+  addDoor('corridorTo201','201',0,-4.69,1.25,'room201',{x:0,z:3.88,yaw:Math.PI},null,0xf0e7d1,{style:'fusuma'});
+  addDoor('corridorTo202','202',4.8,-4.69,1.25,'room202',{x:0,z:3.88,yaw:Math.PI},null,0xeaddcd,{style:'fusuma'});
+  addDoor('corridorToBath','男湯',8.9,4.02,1.3,'bath',{x:-5.25,z:0,yaw:0},null,0xd7ecef,{style:'noren', clothColor:0x2a3f53, subLabel:'MEN'});
   norenDoorModel(4.75, 3.95, null, '女湯', { clothColor:0x7a463b, subLabel:'WOMEN', blocked:true, cleanText:'清掃中' });
 
   const placard = makeTextPlane('客室廊下', 1.7, 0.34, { fg:'#f2ecdf', bg:'rgba(14,10,8,.5)', fontSize:78 });
@@ -1822,7 +1851,7 @@ function buildCorridor(){
   const rackBase = new THREE.Mesh(new THREE.BoxGeometry(1.7,0.55,0.36), materials.darkWood); rackBase.position.set(0,0.28,0); slipperRack.add(rackBase);
   for (const [sx,sz] of [[-0.45,-0.06],[0,0.04],[0.45,-0.02]]) { const pair = new THREE.Mesh(new THREE.BoxGeometry(0.28,0.08,0.16), new THREE.MeshStandardMaterial({ color: 0xe8e0ce, roughness: 1 })); pair.position.set(sx,0.38,sz); slipperRack.add(pair); }
   slipperRack.position.set(-9.3,0,-3.25); slipperRack.traverse(m=>{ if(m.isMesh){ m.castShadow = m.receiveShadow = true; } }); areaGroup.add(slipperRack); addBoxCollider(-9.3,-3.25,1.7,0.36);
-  if (state.step === 'place_amenities') addItem('amenityBox','備品箱',-6.1,2.4, new THREE.Mesh(new THREE.BoxGeometry(0.48,0.18,0.32), new THREE.MeshStandardMaterial({ color: 0xe1d4be, roughness: 1 })), itemInteract);
+  if (state.step === 'place_amenities') addItem('amenityBox','備品箱',-6.4,2.95, new THREE.Mesh(new THREE.BoxGeometry(0.48,0.18,0.32), new THREE.MeshStandardMaterial({ color: 0xe1d4be, roughness: 1 })), itemInteract);
   if (state.step === 'arrange_slippers') addItem('slipperRack','下駄箱前',-9.3,-3.25, new THREE.Mesh(new THREE.BoxGeometry(0.6,0.1,0.3), new THREE.MeshStandardMaterial({ color: 0xf4efe5, roughness: 1 })), itemInteract);
   if (state.step === 'enter_203_phantom') {
     const phantom = new THREE.Group();
@@ -1875,7 +1904,7 @@ function buildRoom201(){
   addFloorShadow(-0.2,0.8,1.8,1.8,0.15);
   addFloorShadow(1.7,-1.2,2.7,3.3,0.13);
   addWallGlow(0,1.65,-4.08,7.2,2.4,0,0xffd39e,0.06);
-  addDoor('room201ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:0,z:-1.8,yaw:0},null,0xf0e7d1,{style:'fusuma'});
+  addDoor('room201ToCorridor','客室廊下',0,4.28,1.1,'corridor',{x:0,z:-1.75,yaw:0},null,0xf0e7d1,{style:'fusuma'});
   addBackdropPlane(realismAssets.roomA, 0, 1.65, -4.1, 7.6, 3.3, 0, 0.7);
   addTeaSet(-0.18, 0.82, 1.0);
   addAndonLamp(-3.78, 2.92, 0.62);
@@ -1901,7 +1930,7 @@ function buildRoom202(){
   addFloorShadow(-0.4,1.0,1.9,1.6,0.15);
   addFloorShadow(1.7,-0.6,2.8,3.1,0.13);
   addWallGlow(0,1.65,-4.08,7.2,2.4,0,0xffd39e,0.06);
-  addDoor('room202ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:4.8,z:-1.2,yaw:0},null,0xeadfcb,{style:'fusuma'});
+  addDoor('room202ToCorridor','客室廊下',0,4.28,1.1,'corridor',{x:4.8,z:-1.15,yaw:0},null,0xeadfcb,{style:'fusuma'});
   addBackdropPlane(realismAssets.roomB, 0, 1.7, -4.1, 7.6, 3.4, 0, 0.74);
   addTeaSet(-0.4, 1.0, 1.0);
   addIkebana(-3.6, 2.85, 0.72);
@@ -1926,7 +1955,7 @@ function buildBath(){
   addFloorShadow(6.9, 0.2, 5.2, 6.4, 0.10);
   addWallGlow(-0.9, 1.55, 3.76, 6.6, 1.7, Math.PI, 0xffd4aa, 0.06);
   runner.position.set(-2.2,-0.085,0); runner.receiveShadow = true; areaGroup.add(runner);
-  addDoor('bathToCorridor','戻る',-6.85,0,1.25,'corridor',{x:6.2,z:1.8,yaw:Math.PI},'x',0xddeff3,{style:'noren', clothColor:0x5b3e2d, signText:'暖簾口'});
+  addDoor('bathToCorridor','戻る',-7.18,0,1.25,'corridor',{x:6.4,z:1.86,yaw:Math.PI},'x',0xddeff3,{style:'noren', clothColor:0x5b3e2d, signText:'暖簾口'});
 
   const slatMat = new THREE.MeshStandardMaterial({ color: 0x8a6b4b, roughness: 1 });
   const frontDesk = new THREE.Group();
@@ -1957,13 +1986,13 @@ function buildBath(){
   const shelfBody = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.4,0.42), materials.darkWood); shelfBody.position.set(4.9,0.7,2.45); shelfBody.castShadow = shelfBody.receiveShadow = true; areaGroup.add(shelfBody); addBoxCollider(4.9,2.45,1.5,0.42);
   for (const sy of [0.48,0.94]) { const plank = new THREE.Mesh(new THREE.BoxGeometry(1.44,0.05,0.5), materials.wood); plank.position.set(4.9,sy,2.45); areaGroup.add(plank); }
   for (const [tx,ty,tz] of [[4.5,1.15,2.47],[4.9,1.15,2.47],[5.3,1.15,2.47],[4.6,0.69,2.47],[5.0,0.69,2.47],[5.4,0.69,2.47]]) { const towel = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.24), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })); towel.position.set(tx,ty,tz); areaGroup.add(towel); }
-  if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',4.9,2.45, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
+  if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',5.05,2.62, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
 
   addLamp(-4.7,0.2,0.62,0xffe6bc); addLamp(-1.0,0.2,0.62,0xffe6bc); addLamp(3.1,0.2,0.58,0xffe6bc);
   addMoodLight(0.9, 1.3, 2.1, 0xffcf96, 0.16, 4.2);
   const phoneTable = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.52,0.58), materials.darkWood); phoneTable.position.set(2.55,0.26,-2.35); areaGroup.add(phoneTable); addBoxCollider(2.55,-2.35,0.9,0.58);
   const phone = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.14,0.32), materials.black); phone.position.set(2.55,0.61,-2.35); areaGroup.add(phone);
-  addItem('phone','黒電話',2.55,-2.35, phone, itemInteract);
+  addItem('phone','黒電話',2.92,-2.52, phone, itemInteract);
 
   wallSegment(4.25,-2.35,0.14,3.2,3.0,materials.wallWarm);
   wallSegment(4.25,2.6,0.14,3.2,2.1,materials.wallWarm);
@@ -2028,8 +2057,8 @@ function buildArchive(){
   wallSegment(0,-5.95,14,3.2,0.14,materials.wallDark); wallSegment(0,5.95,14,3.2,0.14,materials.wallDark); wallSegment(-6.95,0,0.14,3.2,12,materials.wallDark); wallSegment(6.95,0,0.14,3.2,12,materials.wallDark);
   archiveShelves();
   addLamp(-2.6,0,0.6,0xffe0b4); addLamp(2.6,0,0.6,0xffe0b4);
-  addDoor('archiveToLobby','帳場',6.25,0,1.15,'lobby',{x:-5.6,z:-2.2,yaw:0},'x',0xb7b39b);
-  addDoor('archiveToDetached','離れ通路',0,-5.25,1.15,'detached',{x:0,z:4.6,yaw:Math.PI},null,0x9689a6);
+  addDoor('archiveToLobby','帳場',6.78,0,1.15,'lobby',{x:-6.95,z:-3.55,yaw:0},'x',0xb7b39b);
+  addDoor('archiveToDetached','離れ通路',0,-5.56,1.15,'detached',{x:0,z:4.38,yaw:Math.PI},null,0x9689a6);
   const ledger = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.16,0.48), new THREE.MeshStandardMaterial({ color: 0x225688, roughness: 0.85 }));
   ledger.position.y = 1.16;
   addBackdropPlane(realismAssets.forbidden, 0, 1.7, -5.7, 12.4, 3.1, 0, 0.58);
@@ -2046,8 +2075,8 @@ function buildNorth(){
   dirLight.intensity = 0.26;
   wallSegment(0,-3.45,11,3.2,0.14,materials.wallDark); wallSegment(0,3.45,11,3.2,0.14,materials.wallDark); wallSegment(-5.45,0,0.14,3.2,7,materials.wallDark); wallSegment(5.45,0,0.14,3.2,7,materials.wallDark);
   addLamp(-2,0,0.45,0xffc388); addLamp(2.4,0,0.45,0xffc388);
-  addDoor('northToCorridor','客室廊下',-4.85,0,1.1,'corridor',{x:8.1,z:0,yaw:Math.PI},'x',0xbda67e);
-  addDoor('northToDetached','離れ通路',4.85,0,1.1,'detached',{x:-3.8,z:0,yaw:0},'x',0xa89676);
+  addDoor('northToCorridor','客室廊下',-5.18,0,1.1,'corridor',{x:8.75,z:0,yaw:Math.PI},'x',0xbda67e);
+  addDoor('northToDetached','離れ通路',5.18,0,1.1,'detached',{x:-6.78,z:0,yaw:0},'x',0xa89676);
   const rope = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.06,0.06), new THREE.MeshStandardMaterial({ color: 0x8f5c3d, roughness: 1 })); rope.position.set(0,1.4,-1.8); rope.rotation.z = 0.25; areaGroup.add(rope);
   const seal = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.36,0.02), new THREE.MeshStandardMaterial({ color: 0xf7f1df, roughness: 1 })); seal.position.set(0,1.15,-1.78); areaGroup.add(seal);
   addItem('sealTag','閉ざされた札',0,-1.8, seal, itemInteract);
@@ -2064,8 +2093,8 @@ function buildDetached(){
   scene.fog.color.set(0x0c1019); scene.fog.near = 10; scene.fog.far = 28;
   wallSegment(0,-4.95,16,3.2,0.14,materials.wallDark); wallSegment(0,4.95,16,3.2,0.14,materials.wallDark); wallSegment(-7.95,0,0.14,3.2,10,materials.wallDark); wallSegment(7.95,0,0.14,3.2,10,materials.wallDark);
   for(let i=-5;i<=5;i+=5) addLamp(i,0,0.32,0x6e88aa);
-  addDoor('detachedToNorth','北廊下',-7.25,0,1.15,'north',{x:5.2,z:0,yaw:Math.PI},'x',0xa89676);
-  addDoor('detachedToArchive','宿帳庫',0,4.25,1.15,'archive',{x:0,z:-4.2,yaw:0},null,0x9689a6);
+  addDoor('detachedToNorth','北廊下',-7.78,0,1.15,'north',{x:4.4,z:0,yaw:Math.PI},'x',0xa89676);
+  addDoor('detachedToArchive','宿帳庫',0,4.55,1.15,'archive',{x:0,z:-4.65,yaw:0},null,0x9689a6);
   const shrine = new THREE.Group();
   const base = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.44,0.8), materials.darkWood); base.position.y = 0.22; shrine.add(base);
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.84,1.0,0.44), materials.darkWood); body.position.y = 0.92; shrine.add(body);
@@ -2406,7 +2435,7 @@ function getNearestInteractable(){
     const dx = obj.x - player.x, dz = obj.z - player.z;
     const dist = Math.hypot(dx, dz);
     const isCurrentTarget = !!(trigger && trigger.type === obj.type && trigger.id === obj.entity.id);
-    const maxDist = obj.type === 'door' ? 2.4 : (isCurrentTarget ? 4.1 : 3.0);
+    const maxDist = obj.type === 'door' ? 2.4 : (isCurrentTarget ? 3.9 : 2.35);
     if (dist > maxDist) continue;
     const dir = dist > 0.001 ? ((dx * facing.x + dz * facing.z) / dist) : 1;
     const minDir = obj.type === 'door' ? 0.08 : (isCurrentTarget ? -0.55 : -0.18);
