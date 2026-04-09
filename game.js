@@ -355,41 +355,70 @@ const realismAssets = {
   forbidden: loadAssetTexture('assets/forbidden_room.jpg'),
   exterior: loadAssetTexture('assets/ryokan_exterior_night.jpg')
 };
+const posterAssets = {
+  missing: loadAssetTexture('assets/posters/missing.jpg'),
+  wanted: loadAssetTexture('assets/posters/wanted.jpg')
+};
 
 const characterAssets = {
   hero: {
-    front: loadAssetTexture('assets/characters/villager_front.png'),
-    side: loadAssetTexture('assets/characters/villager_side.png'),
+    front: loadAssetTexture('assets/characters/casual_front.png'),
+    side: loadAssetTexture('assets/characters/casual_side.png'),
     portrait: loadAssetTexture('assets/characters/portrait_smile.png')
   },
   okami: {
-    front: loadAssetTexture('assets/characters/okami_front.png'),
-    side: loadAssetTexture('assets/characters/okami_side.png'),
+    front: loadAssetTexture('assets/characters/suit_front.png'),
+    side: loadAssetTexture('assets/characters/suit_side.png'),
     portrait: loadAssetTexture('assets/characters/portrait_smile.png')
   },
   maid: {
-    front: loadAssetTexture('assets/characters/maid_front.png'),
-    side: loadAssetTexture('assets/characters/maid_front.png'),
+    front: loadAssetTexture('assets/characters/yukata_front.png'),
+    side: loadAssetTexture('assets/characters/yukata_side.png'),
     portrait: loadAssetTexture('assets/characters/portrait_smile.png')
   },
   guest: {
-    front: loadAssetTexture('assets/characters/villager_front.png'),
-    side: loadAssetTexture('assets/characters/villager_side.png'),
+    front: loadAssetTexture('assets/characters/casual_front.png'),
+    side: loadAssetTexture('assets/characters/casual_side.png'),
     portrait: loadAssetTexture('assets/characters/portrait_serious.png')
   },
   chef: {
-    front: loadAssetTexture('assets/characters/villager_front.png'),
-    side: loadAssetTexture('assets/characters/villager_side.png'),
+    front: loadAssetTexture('assets/characters/tracksuit_front.png'),
+    side: loadAssetTexture('assets/characters/tracksuit_side.png'),
     portrait: loadAssetTexture('assets/characters/portrait_serious.png')
   },
   villager: {
-    front: loadAssetTexture('assets/characters/villager_front.png'),
-    side: loadAssetTexture('assets/characters/villager_side.png'),
+    front: loadAssetTexture('assets/characters/coat_front.png'),
+    side: loadAssetTexture('assets/characters/coat_side.png'),
     portrait: loadAssetTexture('assets/characters/portrait_smile.png')
   },
   guide: {
-    front: loadAssetTexture('assets/characters/guide_front.png'),
-    side: loadAssetTexture('assets/characters/guide_side.png'),
+    front: loadAssetTexture('assets/characters/guide_scary_front.png'),
+    side: loadAssetTexture('assets/characters/guide_scary_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_serious.png')
+  },
+  suit: {
+    front: loadAssetTexture('assets/characters/suit_front.png'),
+    side: loadAssetTexture('assets/characters/suit_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_smile.png')
+  },
+  casual: {
+    front: loadAssetTexture('assets/characters/casual_front.png'),
+    side: loadAssetTexture('assets/characters/casual_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_smile.png')
+  },
+  tracksuit: {
+    front: loadAssetTexture('assets/characters/tracksuit_front.png'),
+    side: loadAssetTexture('assets/characters/tracksuit_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_serious.png')
+  },
+  yukata: {
+    front: loadAssetTexture('assets/characters/yukata_front.png'),
+    side: loadAssetTexture('assets/characters/yukata_side.png'),
+    portrait: loadAssetTexture('assets/characters/portrait_smile.png')
+  },
+  coat: {
+    front: loadAssetTexture('assets/characters/coat_front.png'),
+    side: loadAssetTexture('assets/characters/coat_side.png'),
     portrait: loadAssetTexture('assets/characters/portrait_serious.png')
   },
   crouch: {
@@ -489,6 +518,20 @@ function addBackdropPlane(tex, x, y, z, w, h, ry=0, opacity=0.92){
   plane.rotation.y = ry;
   areaGroup.add(plane);
   return plane;
+}
+function addFramedPoster(tex, x, y, z, w, h, ry=0){
+  const g = new THREE.Group();
+  const backing = new THREE.Mesh(new THREE.BoxGeometry(w + 0.18, h + 0.18, 0.06), materials.darkWood);
+  backing.position.z = -0.02;
+  backing.castShadow = true;
+  backing.receiveShadow = true;
+  const poster = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
+  poster.position.z = 0.02;
+  g.add(backing, poster);
+  g.position.set(x, y, z);
+  g.rotation.y = ry;
+  areaGroup.add(g);
+  return g;
 }
 
 
@@ -653,11 +696,13 @@ function archiveShelves(){
 
 
 function makeCharacter(type, costume){
-  return createBillboardCharacter(type);
+  const spriteType = typeof costume === 'string' ? costume : type;
+  return createBillboardCharacter(spriteType);
 }
 function addNPC(id, name, faceType, costume, x, z, rot, onInteract){
-  const npc = { id, name, x, z, rot: rot || 0, onInteract, faceType };
-  npc.group = createBillboardCharacter(faceType, { baseYaw: rot || 0 });
+  const spriteType = typeof costume === 'string' ? costume : faceType;
+  const npc = { id, name, x, z, rot: rot || 0, onInteract, faceType, spriteType };
+  npc.group = createBillboardCharacter(spriteType, { baseYaw: rot || 0 });
   npc.group.position.set(x, 0, z);
   dynamicGroup.add(npc.group);
   npcs.push(npc);
@@ -785,48 +830,64 @@ function buildTown(){
   addBoxCollider(-12.4, 0, 5.1, 4.0);
 
   const inn = new THREE.Group();
-  const main = new THREE.Mesh(new THREE.BoxGeometry(7.8, 3.0, 6.2), new THREE.MeshStandardMaterial({ color: 0xd7c6aa, roughness: 1 }));
+  const main = new THREE.Mesh(new THREE.BoxGeometry(8.4, 3.0, 6.8), new THREE.MeshStandardMaterial({ color: 0xd7c6aa, roughness: 1 }));
   main.position.set(0,1.5,0); main.castShadow = true; main.receiveShadow = true; inn.add(main);
-  const wingL = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.6, 3.8), new THREE.MeshStandardMaterial({ color: 0xd2c1a4, roughness: 1 }));
-  wingL.position.set(-4.8,1.3,1.0); wingL.castShadow = true; wingL.receiveShadow = true; inn.add(wingL);
-  const wingR = wingL.clone(); wingR.position.set(4.8,1.3,1.0); inn.add(wingR);
-  const roofMain = new THREE.Mesh(new THREE.ConeGeometry(5.8, 2.2, 4), new THREE.MeshStandardMaterial({ color: 0x514134, roughness: 1 }));
-  roofMain.position.set(0,3.5,0); roofMain.rotation.y = Math.PI * 0.25; roofMain.castShadow = true; roofMain.receiveShadow = true; inn.add(roofMain);
-  const roofWingL = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.5, 4), new THREE.MeshStandardMaterial({ color: 0x5a493c, roughness: 1 }));
-  roofWingL.position.set(-4.8,2.9,1.0); roofWingL.rotation.y = Math.PI * 0.25; roofWingL.castShadow = true; roofWingL.receiveShadow = true; inn.add(roofWingL);
-  const roofWingR = roofWingL.clone(); roofWingR.position.set(4.8,2.9,1.0); inn.add(roofWingR);
-  const porch = new THREE.Mesh(new THREE.BoxGeometry(3.8,0.18,1.9), materials.darkWood); porch.position.set(0,0.18,4.0); porch.castShadow = true; porch.receiveShadow = true; inn.add(porch);
-  const step = new THREE.Mesh(new THREE.BoxGeometry(4.6,0.16,0.9), new THREE.MeshStandardMaterial({ color: 0x857462, roughness: 1 })); step.position.set(0,0.08,5.2); step.receiveShadow = true; inn.add(step);
+  const wingL = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.6, 4.0), new THREE.MeshStandardMaterial({ color: 0xd2c1a4, roughness: 1 }));
+  wingL.position.set(-5.2,1.3,0.8); wingL.castShadow = true; wingL.receiveShadow = true; inn.add(wingL);
+  const wingR = wingL.clone(); wingR.position.set(5.2,1.3,0.8); inn.add(wingR);
+  const roofMain = new THREE.Mesh(new THREE.ConeGeometry(6.3, 2.4, 4), new THREE.MeshStandardMaterial({ color: 0x514134, roughness: 1 }));
+  roofMain.position.set(0,3.6,0); roofMain.rotation.y = Math.PI * 0.25; roofMain.castShadow = true; roofMain.receiveShadow = true; inn.add(roofMain);
+  const roofWingL = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.6, 4), new THREE.MeshStandardMaterial({ color: 0x5a493c, roughness: 1 }));
+  roofWingL.position.set(-5.2,2.9,0.8); roofWingL.rotation.y = Math.PI * 0.25; roofWingL.castShadow = true; roofWingL.receiveShadow = true; inn.add(roofWingL);
+  const roofWingR = roofWingL.clone(); roofWingR.position.set(5.2,2.9,0.8); inn.add(roofWingR);
+
+  const forecourt = new THREE.Mesh(new THREE.BoxGeometry(6.8,0.12,6.8), new THREE.MeshStandardMaterial({ color: 0xada08b, roughness: 1 }));
+  forecourt.position.set(0,0.06,5.3); forecourt.receiveShadow = true; inn.add(forecourt);
+  const stonePath = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.08,10.4), new THREE.MeshStandardMaterial({ color: 0x92816b, roughness: 1 }));
+  stonePath.position.set(0,0.04,1.8); stonePath.receiveShadow = true; inn.add(stonePath);
+  const porch = new THREE.Mesh(new THREE.BoxGeometry(4.4,0.18,2.3), materials.darkWood); porch.position.set(0,0.18,4.2); porch.castShadow = true; porch.receiveShadow = true; inn.add(porch);
+  const step = new THREE.Mesh(new THREE.BoxGeometry(5.2,0.18,1.1), new THREE.MeshStandardMaterial({ color: 0x857462, roughness: 1 })); step.position.set(0,0.09,5.65); step.receiveShadow = true; inn.add(step);
+  const gatePostL = new THREE.Mesh(new THREE.BoxGeometry(0.28,2.4,0.28), materials.darkWood); gatePostL.position.set(-2.2,1.2,6.45); inn.add(gatePostL);
+  const gatePostR = gatePostL.clone(); gatePostR.position.x = 2.2; inn.add(gatePostR);
+  const gateLintel = new THREE.Mesh(new THREE.BoxGeometry(4.8,0.22,0.34), materials.darkWood); gateLintel.position.set(0,2.32,6.45); inn.add(gateLintel);
+  const gateRoof = new THREE.Mesh(new THREE.BoxGeometry(5.3,0.18,1.15), materials.wood); gateRoof.position.set(0,2.52,6.55); inn.add(gateRoof);
+  const gateSign = makeLabelPlane('正面玄関', 1.7, 0.32); gateSign.position.set(0,2.86,6.6); inn.add(gateSign);
+
   const doorFrameL = new THREE.Mesh(new THREE.BoxGeometry(0.16,2.2,0.22), materials.darkWood);
-  doorFrameL.position.set(-1.02,1.1,3.13); doorFrameL.castShadow = true; doorFrameL.receiveShadow = true; inn.add(doorFrameL);
-  const doorFrameR = doorFrameL.clone(); doorFrameR.position.x = 1.02; inn.add(doorFrameR);
-  const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.28,0.24,0.28), materials.darkWood); lintel.position.set(0,2.3,3.06); lintel.castShadow = true; lintel.receiveShadow = true; inn.add(lintel);
-  const doorL = new THREE.Mesh(new THREE.BoxGeometry(0.86,2.02,0.11), new THREE.MeshStandardMaterial({ color: 0xeee6d7, roughness: 0.95 }));
-  doorL.position.set(-0.46,1.02,3.14); doorL.castShadow = true; doorL.receiveShadow = true; inn.add(doorL);
-  const doorR = doorL.clone(); doorR.position.x = 0.46; inn.add(doorR);
-  const handleL = new THREE.Mesh(new THREE.SphereGeometry(0.04,10,10), materials.brass); handleL.position.set(-0.1,1.02,3.21); inn.add(handleL);
-  const handleR = handleL.clone(); handleR.position.x = 0.1; inn.add(handleR);
-  const noren = new THREE.Mesh(new THREE.BoxGeometry(2.1,0.02,0.9), new THREE.MeshStandardMaterial({ color: 0x25496e, roughness: 1 })); noren.position.set(0,2.02,3.42); inn.add(noren);
+  doorFrameL.position.set(-1.12,1.1,3.43); doorFrameL.castShadow = true; doorFrameL.receiveShadow = true; inn.add(doorFrameL);
+  const doorFrameR = doorFrameL.clone(); doorFrameR.position.x = 1.12; inn.add(doorFrameR);
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.48,0.24,0.28), materials.darkWood); lintel.position.set(0,2.3,3.36); lintel.castShadow = true; lintel.receiveShadow = true; inn.add(lintel);
+  const doorL = new THREE.Mesh(new THREE.BoxGeometry(0.94,2.02,0.11), new THREE.MeshStandardMaterial({ color: 0xeee6d7, roughness: 0.95 }));
+  doorL.position.set(-0.5,1.02,3.44); doorL.castShadow = true; doorL.receiveShadow = true; inn.add(doorL);
+  const doorR = doorL.clone(); doorR.position.x = 0.5; inn.add(doorR);
+  const handleL = new THREE.Mesh(new THREE.SphereGeometry(0.04,10,10), materials.brass); handleL.position.set(-0.12,1.02,3.51); inn.add(handleL);
+  const handleR = handleL.clone(); handleR.position.x = 0.12; inn.add(handleR);
+  const noren = new THREE.Mesh(new THREE.BoxGeometry(2.35,0.02,1.0), new THREE.MeshStandardMaterial({ color: 0x25496e, roughness: 1 })); noren.position.set(0,2.02,3.7); inn.add(noren);
   const lanternL = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.26,0.58,16), new THREE.MeshStandardMaterial({ color: 0xf8f1df, emissive: 0x7a5314, emissiveIntensity: 0.18, roughness: 0.8 }));
-  lanternL.position.set(-1.7,1.9,3.55); lanternL.castShadow = true; lanternL.receiveShadow = true; inn.add(lanternL);
-  const lanternR = lanternL.clone(); lanternR.position.set(1.7,1.9,3.55); inn.add(lanternR);
+  lanternL.position.set(-1.9,1.9,4.05); lanternL.castShadow = true; lanternL.receiveShadow = true; inn.add(lanternL);
+  const lanternR = lanternL.clone(); lanternR.position.set(1.9,1.9,4.05); inn.add(lanternR);
+  const stoneLampL = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.22,1.1,12), new THREE.MeshStandardMaterial({ color: 0xb8b0a0, roughness: 1 }));
+  stoneLampL.position.set(-2.6,0.55,5.6); inn.add(stoneLampL);
+  const stoneLampR = stoneLampL.clone(); stoneLampR.position.x = 2.6; inn.add(stoneLampR);
   const windowMat = new THREE.MeshStandardMaterial({ map: makeShojiTexture(320,320), roughness: 1 });
-  for (const x of [-2.6,2.6,-5.0,5.0]) {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(1.4,1.2,0.08), windowMat); win.position.set(x,1.5,3.18); win.castShadow = true; win.receiveShadow = true; inn.add(win);
+  for (const x of [-2.9,2.9,-5.4,5.4]) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.2,0.08), windowMat); win.position.set(x,1.5,3.48); win.castShadow = true; win.receiveShadow = true; inn.add(win);
   }
-  const nameBoard = makeLabelPlane('宵宿旅館', 2.2, 0.5); nameBoard.position.set(0,2.9,3.28); inn.add(nameBoard);
+  const nameBoard = makeLabelPlane('宵宿旅館', 2.3, 0.5); nameBoard.position.set(0,2.95,3.58); inn.add(nameBoard);
   inn.position.set(12.7,0,0); inn.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
   areaGroup.add(inn);
-  addBoxCollider(8.9,0,3.2,6.6);
-  addBoxCollider(16.5,0,3.2,6.6);
-  addBoxCollider(12.7,-2.45,7.4,1.25);
-  addBoxCollider(10.45,2.65,2.9,1.15);
-  addBoxCollider(14.95,2.65,2.9,1.15);
+  addBoxCollider(8.5,0,3.3,7.0);
+  addBoxCollider(16.9,0,3.3,7.0);
+  addBoxCollider(12.7,-2.65,8.0,1.35);
+  addBoxCollider(10.3,3.05,3.3,1.15);
+  addBoxCollider(15.1,3.05,3.3,1.15);
 
-  const gravel = new THREE.Mesh(new THREE.BoxGeometry(4.8,0.04,6.0), new THREE.MeshStandardMaterial({ color: 0xb5a387, roughness: 1 }));
-  gravel.position.set(12.7,-0.05,0); gravel.receiveShadow = true; areaGroup.add(gravel);
-  const path = new THREE.Mesh(new THREE.BoxGeometry(10,0.03,2.5), new THREE.MeshStandardMaterial({ color: 0x9c8a73, roughness: 1 }));
-  path.position.set(8.0,-0.04,0); path.receiveShadow = true; areaGroup.add(path);
+  const gravel = new THREE.Mesh(new THREE.BoxGeometry(5.4,0.04,7.4), new THREE.MeshStandardMaterial({ color: 0xb5a387, roughness: 1 }));
+  gravel.position.set(12.7,-0.05,1.6); gravel.receiveShadow = true; areaGroup.add(gravel);
+  const path = new THREE.Mesh(new THREE.BoxGeometry(10.8,0.03,2.5), new THREE.MeshStandardMaterial({ color: 0x9c8a73, roughness: 1 }));
+  path.position.set(8.2,-0.04,0); path.receiveShadow = true; areaGroup.add(path);
+  const frontPath = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.03,6.4), new THREE.MeshStandardMaterial({ color: 0x9c8a73, roughness: 1 }));
+  frontPath.position.set(12.7,-0.04,3.0); frontPath.receiveShadow = true; areaGroup.add(frontPath);
   const sideFenceMat = new THREE.MeshStandardMaterial({ color: 0x6e5a49, roughness: 1 });
   for (const z of [-6.8, 6.8]) {
     const fence = new THREE.Mesh(new THREE.BoxGeometry(18, 0.9, 0.12), sideFenceMat);
@@ -845,9 +906,9 @@ function buildTown(){
   addLamp(12.7, 2.4, 0.42, 0xffecbf);
 
   addDoor('townToHome','自宅',-9.1,0,1.2,'home',{x:3.4,z:1.0,yaw:Math.PI/2},'x',0xc4c0b5);
-  addDoor('townToLobby','旅館入口',12.7,4.1,1.85,'lobby',{x:0,z:4.8,yaw:Math.PI},undefined,0xc9b07a);
+  addDoor('townToLobby','旅館入口',12.7,5.5,2.1,'lobby',{x:0,z:4.8,yaw:Math.PI},undefined,0xc9b07a);
   addBackdropPlane(realismAssets.exterior, 0, 4.4, -15.5, 18, 8.5, 0, 0.88);
-  addNPC('villager','町の住民','villager',0x607b4d,-2.6,-1.2,Math.PI/2,npcInteract);
+  addNPC('villager','町の住民','villager','coat',-2.6,-1.2,Math.PI/2,npcInteract);
 }
 
 function buildLobby(){
@@ -869,12 +930,18 @@ function buildLobby(){
   const registerBook = new THREE.Mesh(new THREE.BoxGeometry(0.78,0.08,0.54), new THREE.MeshStandardMaterial({ color: 0x31546b, roughness: 0.82 }));
   registerBook.position.y = 1.36;
   if (state.step === 'inspect_register') addItem('registerBook','宿帳',1.1,-4.25, registerBook, itemInteract);
+
+  addFramedPoster(posterAssets.missing, -7.82, 1.65, -0.9, 1.25, 1.75, Math.PI / 2);
+  addFramedPoster(posterAssets.wanted, -7.82, 1.55, -3.25, 1.2, 1.65, Math.PI / 2);
+  addFramedPoster(posterAssets.missing, 7.82, 1.6, 4.1, 1.15, 1.55, -Math.PI / 2);
+
   addDoor('lobbyToCorridor', '客室廊下', 7.32, 0, 1.35, 'corridor', { x: -7.6, z: 0, yaw: 0 });
   addDoor('lobbyToKitchen', '厨房', -7.32, 2.6, 1.2, 'kitchen', { x: 5.0, z: -1.2, yaw: Math.PI });
   addDoor('lobbyToArchive', '宿帳庫', -7.32, -2.6, 1.2, 'archive', { x: 5.1, z: 0, yaw: Math.PI });
-  addNPC('okami', '女将', 'okami', 0x6d3d44, 0, -3.0, Math.PI, npcInteract);
+  addNPC('okami', '女将', 'okami', 'suit', 0, -3.0, Math.PI, npcInteract);
 }
 
+function buildKitchen(){
 function buildKitchen(){
   createFloor(11, 9, materials.tile, -0.1);
   createCeiling(11, 9, 0xece7dd);
@@ -883,7 +950,7 @@ function buildKitchen(){
   const stove = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.92,0.8), new THREE.MeshStandardMaterial({ color: 0x54565d, roughness: 0.5 })); stove.position.set(-3.7,0.46,2.5); areaGroup.add(stove); addBoxCollider(-3.7,2.5,1.6,0.8);
   addLamp(0,0,0.9); addLamp(3.2,-1.4,0.7);
   addDoor('kitchenToLobby','帳場',5.0,-1.2,1.2,'lobby',{x:-4.8,z:2.2,yaw:0},'x');
-  addNPC('chef','料理番','chef',0xffffff,1.8,-1.2,-Math.PI/2,npcInteract);
+  addNPC('chef','料理番','chef','tracksuit',1.8,-1.2,-Math.PI/2,npcInteract);
   const teaTray = new THREE.Mesh(new THREE.BoxGeometry(0.86,0.08,0.56), new THREE.MeshStandardMaterial({ color: 0x7a4e2f, roughness: 0.85 }));
   teaTray.position.y = 0.94;
   const teapot = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.16,0.18,18), new THREE.MeshStandardMaterial({ color: 0xdfddd7, roughness: 0.55 }));
@@ -911,7 +978,7 @@ function buildCorridor(){
   addDoor('corridorToLobby','帳場',-11.34,0,1.2,'lobby',{x:7.1,z:0,yaw:Math.PI},'x');
   addDoor('corridorTo201','201',0,-4.58,1.2,'room201',{x:0,z:4.0,yaw:Math.PI},null,0xf0e7d1);
   addDoor('corridorTo202','202',4.8,-4.58,1.2,'room202',{x:0,z:4.0,yaw:Math.PI},null,0xeaddcd);
-  addDoor('corridorToBath','浴場',7.7,4.58,1.2,'bath',{x:-3.6,z:0,yaw:0},null,0xd7ecef);
+  addDoor('corridorToBath','浴場',7.7,4.58,1.2,'bath',{x:-5.2,z:0,yaw:0},null,0xd7ecef);
   addDoor('corridorToNorth','北廊下',11.34,0,1.2,'north',{x:-3.7,z:0,yaw:0},'x',0xc3b28a);
   const placard = makeLabelPlane('客室廊下', 1.8, 0.45); placard.position.set(-8.4,2.4,-4.6); areaGroup.add(placard);
   const amenityBox = new THREE.Mesh(new THREE.BoxGeometry(0.88,0.7,0.64), materials.darkWood); amenityBox.position.set(-6.1,0.35,2.4); amenityBox.castShadow = amenityBox.receiveShadow = true; areaGroup.add(amenityBox); addBoxCollider(-6.1,2.4,0.88,0.64);
@@ -927,7 +994,7 @@ function buildCorridor(){
     addItem('lostKey','鍵束',3.2,1.25,lostKey,itemInteract);
   }
   addBackdropPlane(realismAssets.corridor, 0, 1.7, -4.2, 15.2, 2.7, 0, 0.72);
-  addNPC('maid','仲居','maid',0x575a79,4.6,1.2,Math.PI,npcInteract);
+  addNPC('maid','仲居','maid','yukata',4.6,1.2,Math.PI,npcInteract);
 }
 
 function buildRoom201(){
@@ -939,7 +1006,7 @@ function buildRoom201(){
   const table = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.38,1.2), materials.darkWood); table.position.set(-0.2,0.19,0.8); areaGroup.add(table); addBoxCollider(-0.2,0.8,1.2,1.2);
   addLamp(0,0,0.8); addDoor('room201ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:0,z:-1.8,yaw:0},null,0xf0e7d1);
   addBackdropPlane(realismAssets.roomA, 0, 1.65, -4.1, 7.6, 3.3, 0, 0.7);
-  addNPC('guest201','201号室の客','guest',0x423d52,-1.6,-1.2,Math.PI/2,npcInteract);
+  addNPC('guest201','201号室の客','guest','casual',-1.6,-1.2,Math.PI/2,npcInteract);
 }
 
 
@@ -954,24 +1021,55 @@ function buildRoom202(){
   addLamp(0,0,0.8);
   addDoor('room202ToCorridor','客室廊下',0,4.18,1.1,'corridor',{x:4.8,z:-1.2,yaw:0},null,0xeadfcb);
   addBackdropPlane(realismAssets.roomB, 0, 1.7, -4.1, 7.6, 3.4, 0, 0.74);
-  addNPC('guest202','202号室の客','guest',0x5c5f6a,-1.4,-1.0,Math.PI/2,npcInteract);
+  addNPC('guest202','202号室の客','guest','coat',-1.4,-1.0,Math.PI/2,npcInteract);
 }
 
 function buildBath(){
-  createFloor(10, 8, materials.tile, -0.1);
-  createCeiling(10, 8, 0xe9ecef);
-  wallSegment(0,-3.95,10,3.2,0.14,materials.wallRose); wallSegment(0,3.95,10,3.2,0.14,materials.wallRose); wallSegment(-4.95,0,0.14,3.2,8,materials.wallRose); wallSegment(4.95,0,0.14,3.2,8,materials.wallRose);
+  createFloor(15, 8, materials.tile, -0.1);
+  createCeiling(15, 8, 0xe9ecef);
+  wallSegment(0,-3.95,15,3.2,0.14,materials.wallRose);
+  wallSegment(0,3.95,15,3.2,0.14,materials.wallRose);
+  wallSegment(-7.45,0,0.14,3.2,8,materials.wallRose);
+  wallSegment(7.45,0,0.14,3.2,8,materials.wallRose);
   bathCurtain();
-  const bench = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.42,0.6), materials.darkWood); bench.position.set(2.2,0.21,2.8); areaGroup.add(bench); addBoxCollider(2.2,2.8,2.2,0.6);
-  const shelfBody = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.4,0.42), materials.darkWood); shelfBody.position.set(2.35,0.7,2.45); shelfBody.castShadow = shelfBody.receiveShadow = true; areaGroup.add(shelfBody); addBoxCollider(2.35,2.45,1.5,0.42);
-  for (const sy of [0.48,0.94]) { const plank = new THREE.Mesh(new THREE.BoxGeometry(1.44,0.05,0.5), materials.wood); plank.position.set(2.35,sy,2.45); areaGroup.add(plank); }
-  for (const [tx,ty,tz] of [[1.95,1.15,2.47],[2.35,1.15,2.47],[2.75,1.15,2.47],[2.05,0.69,2.47],[2.45,0.69,2.47],[2.85,0.69,2.47]]) { const towel = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.24), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })); towel.position.set(tx,ty,tz); areaGroup.add(towel); }
-  if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',2.35,2.45, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
-  addLamp(-2.3,0,0.7,0xffe6bc); addLamp(2.3,0,0.7,0xffe6bc);
-  addDoor('bathToCorridor','客室廊下',-4.35,0,1.2,'corridor',{x:6.2,z:1.8,yaw:Math.PI},'x',0xddeff3);
-  const phoneTable = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.52,0.58), materials.darkWood); phoneTable.position.set(2.5,0.26,-2.5); areaGroup.add(phoneTable); addBoxCollider(2.5,-2.5,0.9,0.58);
-  const phone = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.14,0.32), materials.black); phone.position.set(2.5,0.61,-2.5); areaGroup.add(phone);
-  addItem('phone','黒電話',2.5,-2.5, phone, itemInteract);
+
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.42,0.6), materials.darkWood); bench.position.set(0.8,0.21,2.8); areaGroup.add(bench); addBoxCollider(0.8,2.8,2.2,0.6);
+  const shelfBody = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.4,0.42), materials.darkWood); shelfBody.position.set(1.1,0.7,2.45); shelfBody.castShadow = shelfBody.receiveShadow = true; areaGroup.add(shelfBody); addBoxCollider(1.1,2.45,1.5,0.42);
+  for (const sy of [0.48,0.94]) { const plank = new THREE.Mesh(new THREE.BoxGeometry(1.44,0.05,0.5), materials.wood); plank.position.set(1.1,sy,2.45); areaGroup.add(plank); }
+  for (const [tx,ty,tz] of [[0.7,1.15,2.47],[1.1,1.15,2.47],[1.5,1.15,2.47],[0.8,0.69,2.47],[1.2,0.69,2.47],[1.6,0.69,2.47]]) { const towel = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.24), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })); towel.position.set(tx,ty,tz); areaGroup.add(towel); }
+  if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',1.1,2.45, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
+
+  addLamp(-3.6,0,0.7,0xffe6bc); addLamp(0.4,0,0.7,0xffe6bc); addLamp(4.9,0,0.58,0xffe6bc);
+  addDoor('bathToCorridor','客室廊下',-6.85,0,1.2,'corridor',{x:6.2,z:1.8,yaw:Math.PI},'x',0xddeff3);
+  const phoneTable = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.52,0.58), materials.darkWood); phoneTable.position.set(-0.4,0.26,-2.5); areaGroup.add(phoneTable); addBoxCollider(-0.4,-2.5,0.9,0.58);
+  const phone = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.14,0.32), materials.black); phone.position.set(-0.4,0.61,-2.5); areaGroup.add(phone);
+  addItem('phone','黒電話',-0.4,-2.5, phone, itemInteract);
+
+  wallSegment(2.2,-2.35,0.14,3.2,3.0,materials.wallRose);
+  wallSegment(2.2,2.6,0.14,3.2,2.1,materials.wallRose);
+  const toiletLintel = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.36,2.0), materials.darkWood); toiletLintel.position.set(2.2,2.82,0.25); areaGroup.add(toiletLintel);
+  const toiletSign = makeLabelPlane('トイレ', 0.9, 0.24); toiletSign.position.set(2.28,2.55,0.25); toiletSign.rotation.y = -Math.PI / 2; areaGroup.add(toiletSign);
+
+  const toiletFloor = new THREE.Mesh(new THREE.BoxGeometry(5.0,0.03,6.8), new THREE.MeshStandardMaterial({ color: 0xd9d9d7, roughness: 1 }));
+  toiletFloor.position.set(4.85,-0.085,0.2); toiletFloor.receiveShadow = true; areaGroup.add(toiletFloor);
+
+  const stallBack = new THREE.Mesh(new THREE.BoxGeometry(4.8,2.2,0.14), materials.wallWarm); stallBack.position.set(4.85,1.1,3.15); areaGroup.add(stallBack); addBoxCollider(4.85,3.15,4.8,0.14);
+  const stallLeft = new THREE.Mesh(new THREE.BoxGeometry(0.14,2.2,2.5), materials.wallWarm); stallLeft.position.set(2.55,1.1,1.95); areaGroup.add(stallLeft); addBoxCollider(2.55,1.95,0.14,2.5);
+  const stallRight = stallLeft.clone(); stallRight.position.x = 7.15; areaGroup.add(stallRight); addBoxCollider(7.15,1.95,0.14,2.5);
+  const stallDivider = stallLeft.clone(); stallDivider.position.set(5.0,1.1,1.95); areaGroup.add(stallDivider); addBoxCollider(5.0,1.95,0.14,2.5);
+  const stallDoorL = new THREE.Mesh(new THREE.BoxGeometry(2.1,1.85,0.06), new THREE.MeshStandardMaterial({ color: 0xf0efe9, roughness: 1 })); stallDoorL.position.set(3.85,0.95,0.8); areaGroup.add(stallDoorL);
+  const stallDoorR = stallDoorL.clone(); stallDoorR.position.x = 6.05; areaGroup.add(stallDoorR);
+
+  const toiletA = new THREE.Group();
+  const bowlA = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.34,0.58,18), materials.paper); bowlA.position.set(0,0.29,0); bowlA.castShadow = bowlA.receiveShadow = true; toiletA.add(bowlA);
+  const tankA = new THREE.Mesh(new THREE.BoxGeometry(0.45,0.5,0.24), materials.paper); tankA.position.set(0,0.73,-0.18); toiletA.add(tankA);
+  toiletA.position.set(3.85,0,2.35); areaGroup.add(toiletA); addBoxCollider(3.85,2.35,0.9,0.9);
+
+  const toiletB = toiletA.clone(); toiletB.position.set(6.05,0,2.35); areaGroup.add(toiletB); addBoxCollider(6.05,2.35,0.9,0.9);
+  const sinkBase = new THREE.Mesh(new THREE.BoxGeometry(1.0,0.86,0.5), materials.paper); sinkBase.position.set(6.2,0.43,-2.2); areaGroup.add(sinkBase); addBoxCollider(6.2,-2.2,1.0,0.5);
+  const mirror = new THREE.Mesh(new THREE.BoxGeometry(1.1,1.4,0.06), new THREE.MeshStandardMaterial({ color: 0xc3d4e2, roughness: 0.2, metalness: 0.1 })); mirror.position.set(6.2,1.45,-2.6); areaGroup.add(mirror);
+
+  addNPC('toiletGuest','しゃがみ客','guest','crouch',4.1,1.42,0,function(){});
 }
 
 function buildArchive(){
@@ -1734,4 +1832,5 @@ window.addEventListener('error', function(e){
   }
   box.textContent = 'runtime error: ' + (e.message || 'unknown') + '\n' + (e.filename || '') + ':' + (e.lineno || 0);
 });
+}
 })();

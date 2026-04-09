@@ -11,3 +11,5 @@
 - 3スロットセーブ / ロード
 
 - B4 Realism Pass: realistic scale pass, improved human meshes, asset-driven backdrop integration, higher ceilings.
+
+- b9: 田舎町の旅館外観を正面玄関寄りに調整、帳場に行方不明者ポスター追加、浴場内にトイレ区画としゃがみキャラを追加、役職ごとの服装差し替えを反映。
