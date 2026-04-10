@@ -41,7 +41,7 @@ body{overscroll-behavior:none;}
 .hud-left,.hud-right{position:absolute; top:calc(var(--safe-top) + 14px); display:flex; gap:10px; align-items:flex-start;}
 .hud-left{left:calc(var(--safe-left) + 14px); flex-direction:column;}
 .hud-right{right:calc(var(--safe-right) + 14px); flex-direction:column; align-items:flex-end;}
-.badge,.distance-pill,.menu-btn,.objective-panel,.prompt,.menu-card,.dialogue,.joystick-base,.act-btn,.run-btn,.look-zone,#minimap{backdrop-filter:blur(10px); background:var(--panel); border:1px solid var(--line); box-shadow:0 16px 34px rgba(0,0,0,.28);}
+.badge,.distance-pill,.menu-btn,.objective-panel,.prompt,.menu-card,.dialogue,.joystick-base,.act-btn,.run-btn,#minimap{backdrop-filter:blur(10px); background:var(--panel); border:1px solid var(--line); box-shadow:0 16px 34px rgba(0,0,0,.28);}
 .badge{padding:6px 9px; border-radius:12px; min-width:64px; font-weight:700; text-align:center; font-size:11px;}
 .badge.secondary{color:#e5d1ad; opacity:.92;}
 #objective-panel,#minimap{display:none !important;}
@@ -62,7 +62,9 @@ body{overscroll-behavior:none;}
 .move-label{position:absolute; left:14px; top:10px; color:rgba(203,195,178,.62); font-size:12px; letter-spacing:.18em;}
 .joystick-base{position:absolute; inset:0; border-radius:32px; display:grid; place-items:center; background:rgba(6,8,15,.18); border:1px solid rgba(177,162,122,.16); box-shadow:0 10px 22px rgba(0,0,0,.10);} 
 .joystick-knob{width:62px; height:62px; border-radius:50%; background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.18); transform:translate3d(0,0,0);} 
-.look-zone{position:absolute; z-index:2; right:calc(var(--safe-right) + 6px); bottom:calc(var(--safe-bottom) + 8px); width:min(62vw, 392px); height:min(54vh, 380px); border-radius:30px; display:grid; place-items:start end; padding:14px 16px; color:rgba(231,218,190,.42); font-size:11px; letter-spacing:.16em; pointer-events:auto; touch-action:none; background:linear-gradient(180deg, rgba(6,8,15,.03), rgba(6,8,15,.08)); border:1px solid rgba(177,162,122,.10);} 
+.look-zone{position:absolute; z-index:2; right:calc(var(--safe-right) + 6px); bottom:calc(var(--safe-bottom) + 8px); width:min(62vw, 392px); height:min(54vh, 380px); border-radius:30px; display:grid; place-items:start end; padding:14px 16px; color:rgba(231,218,190,.38); font-size:11px; letter-spacing:.16em; pointer-events:auto; touch-action:none; background:transparent; border:none; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; overflow:hidden;} 
+
+.look-zone span{display:inline-block; padding:0; background:transparent; color:rgba(231,218,190,.42); text-shadow:0 1px 2px rgba(0,0,0,.25); user-select:none; -webkit-user-select:none;}
 .run-btn{position:absolute; z-index:6; right:calc(var(--safe-right) + 18px); bottom:calc(var(--safe-bottom) + 126px); width:142px; height:72px; border-radius:24px; pointer-events:auto; appearance:none; border:none; color:rgba(255,247,233,.98); font-size:25px; font-weight:900; letter-spacing:.06em; background:rgba(132,91,34,.9); border:1px solid rgba(255,222,168,.68); box-shadow:0 16px 30px rgba(0,0,0,.22); touch-action:none;}
 .run-btn.active{transform:scale(.98); background:rgba(184,124,30,.98); box-shadow:0 14px 34px rgba(255,181,71,.28);}
 .act-btn{position:absolute; z-index:4; right:calc(var(--safe-right) + 18px); bottom:calc(var(--safe-bottom) + 18px); width:150px; height:96px; border-radius:26px; pointer-events:auto; appearance:none; border:none; color:rgba(255,255,255,.94); font-size:40px; font-weight:900; letter-spacing:.04em; background:rgba(6,8,15,.28); border:1px solid rgba(177,162,122,.16); box-shadow:0 10px 22px rgba(0,0,0,.10); touch-action:none;} 
@@ -87,7 +89,7 @@ body{overscroll-behavior:none;}
   .badge{min-width:76px; padding:8px 10px; font-size:13px;}
   .act-btn{width:132px; height:86px; font-size:34px;}
   .run-btn{width:128px; height:64px; bottom:calc(var(--safe-bottom) + 118px); font-size:22px;}
-  .look-zone{right:calc(var(--safe-right) + 6px); width:min(60vw, 316px); height:min(48vh, 320px); font-size:10px;}
+  .look-zone{right:calc(var(--safe-right) + 6px); width:min(60vw, 316px); height:min(48vh, 320px); font-size:10px; background:transparent; border:none; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none;}
   .joystick-zone{width:142px; height:142px;}
   .dialogue{grid-template-columns:96px 1fr;}
   .portrait{min-height:142px;}

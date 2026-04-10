@@ -134,6 +134,7 @@ const doors = [];
 const npcs = [];
 const items = [];
 const areaAnchors = {};
+let interactionMarker = null;
 const graph = {
   home: { town: 12 },
   town: { home: 12, lobby: 18 },
@@ -181,7 +182,7 @@ const stepDefs = {
   finale: { day: 2, phase: '終幕', text: '女将に宿帳のことを問いただす', sub: '帳場へ', targetArea: 'lobby', targetPos: { x: 0, z: -2 }, trigger: { type: 'npc', id: 'okami' } },
   sleep_day2: { day: 2, phase: '帰宅', text: '布団で眠って体を休める', sub: '布団へ', targetArea: 'home', targetPos: { x: 0.8, z: 0.9 }, trigger: { type: 'item', id: 'futonBed' } },
   leave_home_day3: { day: 3, phase: '朝', text: '玄関から外へ出る', sub: '玄関へ', targetArea: 'home', targetPos: { x: 4.4, z: 1.1 }, trigger: { type: 'door', id: 'homeToTown' } },
-  inspect_poster_day3: { day: 3, phase: '朝', text: '町の掲示板の貼り紙を確かめる', sub: '掲示板へ', targetArea: 'town', targetPos: { x: -0.5, z: 2.8 }, trigger: { type: 'item', id: 'posterBoard' } },
+  inspect_poster_day3: { day: 3, phase: '朝', text: '町の掲示板の貼り紙を確かめる', sub: '掲示板へ', targetArea: 'town', targetPos: { x: -1.1, z: 1.95 }, trigger: { type: 'item', id: 'posterBoard' } },
   commute_day3: { day: 3, phase: '朝', text: '旅館へ向かう', sub: '旅館入口へ', targetArea: 'town', targetPos: { x: 9.2, z: 0.0 }, trigger: { type: 'door', id: 'townToLobby' } },
   talk_okami_day3: { day: 3, phase: '昼勤務', text: '帳場で女将の指示を聞く', sub: '帳場へ', targetArea: 'lobby', targetPos: { x: 0, z: -2.8 }, trigger: { type: 'npc', id: 'okami' } },
   inspect_guestbook_203: { day: 3, phase: '昼勤務', text: '帳場で203号室の記録を確かめる', sub: '宿帳へ', targetArea: 'lobby', targetPos: { x: 1.1, z: -4.25 }, trigger: { type: 'item', id: 'registerBook' } },
@@ -690,11 +691,11 @@ function maybeStartLobbyArrivalCutscene(entryDoorId){
   if (!(state.step === 'talk_okami' || state.step === 'walk_to_ryokan')) return;
   const okami = npcs.find(n => n.id === 'okami');
   if (!okami) return;
-  const sx = -6.42, sz = 3.55, mx = -3.15, mz = 1.85, ex = 0.0, ez = -3.05;
+  const sx = -6.72, sz = 2.75, mx = -3.55, mz = 1.7, ex = 0.0, ez = -3.05;
   okami.group.position.set(sx, 0, sz); okami.x = sx; okami.z = sz; okami.rot = -0.05;
   const yawForward = 0;
-  const yawSideDoor = 0.88;
-  const yawDesk = Math.PI;
+  const yawSideDoor = 0.42;
+  const yawDesk = 0.02;
   startCutscene([
     {
       duration: 0.48,
@@ -751,7 +752,7 @@ function maybeStartLobbyArrivalCutscene(entryDoorId){
         player.yaw = lerpAngle(player.yaw, yawDesk, easeInOut(t));
         player.pitch = lerp(player.pitch, -0.02, t);
       },
-      onEnd(){ state.questFlags.okamiArrivalSceneDone = true; saveToSlot(1, true); }
+      onEnd(){ player.yaw = yawDesk; state.questFlags.okamiArrivalSceneDone = true; saveToSlot(1, true); }
     }
   ]);
 }
@@ -1042,6 +1043,7 @@ function fusumaDoorModel(x, z, axis, label, opts={}){
   const sign = makeTextPlane(label || '客室', 0.72, 0.14, { fg: '#f5efe4', bg: 'rgba(0,0,0,0)', fontSize: 74 });
   sign.position.set(0, 2.52, 0.04);
   g.add(signBase, sign);
+  addDoorCue(g, 1.16, 0.58);
   if (axis === 'x') g.rotation.y = Math.PI/2;
   g.position.set(x,0,z);
   g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
@@ -1085,6 +1087,7 @@ function norenDoorModel(x, z, axis, label, opts={}){
     stand.position.set(0,0,0.48);
     g.add(stand);
   }
+  addDoorCue(g, width * 0.88, 0.5);
   if (axis === 'x') g.rotation.y = Math.PI/2;
   g.position.set(x,0,z);
   g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
@@ -1106,6 +1109,21 @@ function makeCleaningSign(w=0.8, h=0.5, text='清掃中'){
   g.add(frame, board, legL, legR, txt);
   g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
   return g;
+}
+function addDoorCue(group, width=1.28, depth=0.62){
+  const cue = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshBasicMaterial({ color: 0xd8b16a, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })
+  );
+  cue.rotation.x = -Math.PI / 2;
+  cue.position.set(0, 0.028, 0.42);
+  const edge = new THREE.Mesh(
+    new THREE.RingGeometry(Math.min(width, depth) * 0.22, Math.min(width, depth) * 0.29, 24),
+    new THREE.MeshBasicMaterial({ color: 0xf6de9c, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false })
+  );
+  edge.rotation.x = -Math.PI / 2;
+  edge.position.set(0, 0.03, 0.42);
+  group.add(cue, edge);
 }
 
 
@@ -1249,6 +1267,7 @@ function doorModel(x,z,axis,label,color,opts={}){
   const signText = makeTextPlane(label || '扉', 0.82, 0.16, { fg:'#f4eee1', bg:'rgba(0,0,0,0)', fontSize: 78 });
   signText.position.set(0, 2.52, 0.045);
   g.add(surround, shadowPocket, left, right, top, sill, panel, handlePlate, knob, signBase, signText);
+  addDoorCue(g, 1.12, 0.56);
   if (axis === 'x') g.rotation.y = Math.PI / 2;
   g.position.set(x,0,z);
   g.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
@@ -1433,6 +1452,94 @@ function addTree(x, z, scale){
 }
 
 
+
+function makeMarkerTexture(text){
+  const c = document.createElement('canvas');
+  c.width = 384; c.height = 160;
+  const g = c.getContext('2d');
+  g.clearRect(0,0,c.width,c.height);
+  g.fillStyle = 'rgba(18,12,8,0.72)';
+  g.strokeStyle = 'rgba(236,205,132,0.95)';
+  g.lineWidth = 6;
+  const x=16,y=18,w=352,h=124,r=28;
+  g.beginPath();
+  g.moveTo(x+r,y);
+  g.arcTo(x+w,y,x+w,y+h,r);
+  g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r);
+  g.arcTo(x,y,x+w,y,r);
+  g.closePath();
+  g.fill(); g.stroke();
+  g.fillStyle = '#fff6df';
+  g.font = 'bold 76px sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text || 'ACT', c.width/2, c.height/2 + 4);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function ensureInteractionMarker(){
+  if (interactionMarker) return interactionMarker;
+  interactionMarker = new THREE.Group();
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.24, 0.34, 28),
+    new THREE.MeshBasicMaterial({ color: 0xe2bc73, transparent: true, opacity: 0.42, side: THREE.DoubleSide, depthWrite: false })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.03;
+  const inner = new THREE.Mesh(
+    new THREE.CircleGeometry(0.07, 20),
+    new THREE.MeshBasicMaterial({ color: 0xf7ead2, transparent: true, opacity: 0.85, depthWrite: false })
+  );
+  inner.rotation.x = -Math.PI / 2;
+  inner.position.y = 0.035;
+  const badge = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.94, 0.38),
+    new THREE.MeshBasicMaterial({ map: makeMarkerTexture('ACT'), transparent: true, depthWrite: false })
+  );
+  badge.position.set(0, 1.22, 0);
+  interactionMarker.add(ring, inner, badge);
+  interactionMarker.visible = false;
+  interactionMarker.userData.ring = ring;
+  interactionMarker.userData.inner = inner;
+  interactionMarker.userData.badge = badge;
+  interactionMarker.userData.label = 'ACT';
+  rootGroup.add(interactionMarker);
+  return interactionMarker;
+}
+function setInteractionMarkerLabel(text){
+  const marker = ensureInteractionMarker();
+  const label = text || 'ACT';
+  if (marker.userData.label === label) return;
+  marker.userData.label = label;
+  marker.userData.badge.material.map?.dispose?.();
+  marker.userData.badge.material.map = makeMarkerTexture(label);
+  marker.userData.badge.material.needsUpdate = true;
+}
+function clearInteractionMarker(){
+  if (!interactionMarker) return;
+  interactionMarker.visible = false;
+}
+function updateInteractionMarker(){
+  const marker = ensureInteractionMarker();
+  const now = performance.now();
+  const obj = getNearestInteractable();
+  if (!obj || state.menuOpen || !dialogueOverlay.classList.contains('hidden') || now < state.inputLockUntil) {
+    marker.visible = false;
+    return;
+  }
+  const pulse = 1 + Math.sin(now * 0.008) * 0.06;
+  marker.visible = true;
+  marker.position.set(obj.x, 0, obj.z);
+  marker.scale.setScalar(pulse);
+  marker.userData.ring.material.opacity = obj.type === 'door' ? 0.52 : 0.34;
+  marker.userData.inner.material.opacity = obj.type === 'door' ? 0.95 : 0.82;
+  marker.userData.badge.position.y = obj.type === 'npc' ? 2.15 : (obj.type === 'door' ? 2.4 : 1.18);
+  marker.userData.badge.lookAt(camera.position);
+  setInteractionMarkerLabel(obj.type === 'door' ? 'DOOR' : 'ACT');
+}
+
 function maybeStartDay3GuideTease(){
   if (state.cutscene || state.menuOpen || state.chase) return;
   if (state.area !== 'corridor' || state.step !== 'guide_tease_day3') return;
@@ -1480,7 +1587,7 @@ function maybeStartDay3GuideTease(){
 }
 
 function buildArea(areaId){
-  areaGroup.clear(); dynamicGroup.clear(); clearArray(colliders); clearArray(doors); clearArray(npcs); clearArray(items); state.previewGuide = null; state.cutscene = null;
+  areaGroup.clear(); dynamicGroup.clear(); clearArray(colliders); clearArray(doors); clearArray(npcs); clearArray(items); clearInteractionMarker(); state.previewGuide = null; state.cutscene = null;
   areaLabelEl.textContent = areaLabels[areaId];
   phaseLabelEl.textContent = stepDefs[state.step].phase;
   dayLabelEl.textContent = 'DAY ' + stepDefs[state.step].day;
@@ -1679,19 +1786,19 @@ function buildTown(){
     extra.rotation.z = -0.08;
     posterBoard.add(extra);
   }
-  posterBoard.position.set(-0.45, 0, 2.85);
-  posterBoard.rotation.y = -Math.PI * 0.16;
+  posterBoard.position.set(-1.1, 0, 2.15);
+  posterBoard.rotation.y = -Math.PI * 0.08;
   posterBoard.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } });
   areaGroup.add(posterBoard);
-  addBoxCollider(-0.45, 2.85, 2.1, 0.5);
+  addBoxCollider(-1.1, 2.15, 2.4, 0.8);
   if (state.step === 'inspect_poster_day3') {
-    const trigger = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.5, 0.16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.01 }));
-    trigger.position.y = 1.45;
-    addItem('posterBoard', '掲示板', -0.45, 2.85, trigger, itemInteract);
+    const trigger = new THREE.Mesh(new THREE.BoxGeometry(2.7, 1.9, 0.5), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.01 }));
+    trigger.position.y = 1.35;
+    addItem('posterBoard', '掲示板', -1.1, 2.15, trigger, itemInteract);
   }
 
   addDoor('townToHome','自宅',-9.1,0,1.2,'home',{x:3.4,z:1.0,yaw:Math.PI/2},'x',0xc4c0b5);
-  addDoor('townToLobby','旅館入口',9.42,0,2.0,'lobby',{x:0,z:5.45,yaw:0},'x',0xc9b07a);
+  addDoor('townToLobby','旅館入口',9.42,0,2.0,'lobby',{x:0,z:5.85,yaw:0},'x',0xc9b07a);
   addBackdropPlane(realismAssets.exterior, 0, 4.4, -15.5, 18, 8.5, 0, 0.88);
   addNPC('villager','町の住民','villager','coat',-2.6,-1.2,Math.PI/2,npcInteract);
 }
@@ -1736,11 +1843,11 @@ function buildLobby(){
   const noticePaper = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.72, 0.03), new THREE.MeshStandardMaterial({ color: 0xeee1c4, roughness: 1 }));
   noticePaper.position.set(-5.3, 1.82, -6.68); areaGroup.add(noticePaper);
   const cabinet = new THREE.Mesh(new THREE.BoxGeometry(1.3,1.8,0.6), materials.darkWood);
-  cabinet.position.set(-6.2,0.9,4.4); cabinet.castShadow = cabinet.receiveShadow = true; areaGroup.add(cabinet); addBoxCollider(-5.2,3.4,1.3,0.6);
+  cabinet.position.set(-6.35,0.9,5.15); cabinet.castShadow = cabinet.receiveShadow = true; areaGroup.add(cabinet); addBoxCollider(-6.35,5.15,1.3,0.6);
   const blackPhone = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.14,0.28), materials.black);
   blackPhone.position.set(2.2,1.36,-4.35); areaGroup.add(blackPhone);
   const amenityCab = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.4,0.46), new THREE.MeshStandardMaterial({ color: 0x8f7555, roughness: 0.9 })); amenityCab.position.y = 1.28;
-  if (state.step === 'stock_amenities') addItem('amenityBag','客用備品袋',-5.95,4.95, amenityCab, itemInteract);
+  if (state.step === 'stock_amenities') addItem('amenityBag','客用備品袋',-6.12,5.12, amenityCab, itemInteract);
   const registerBook = new THREE.Mesh(new THREE.BoxGeometry(0.78,0.08,0.54), new THREE.MeshStandardMaterial({ color: 0x31546b, roughness: 0.82 }));
   registerBook.position.y = 1.36;
   if (state.step === 'inspect_register' || state.step === 'inspect_guestbook_203') addItem('registerBook','宿帳',1.1,-4.25, registerBook, itemInteract);
@@ -2435,10 +2542,11 @@ function getNearestInteractable(){
     const dx = obj.x - player.x, dz = obj.z - player.z;
     const dist = Math.hypot(dx, dz);
     const isCurrentTarget = !!(trigger && trigger.type === obj.type && trigger.id === obj.entity.id);
-    const maxDist = obj.type === 'door' ? 2.4 : (isCurrentTarget ? 3.9 : 2.35);
+    const posterBoost = obj.entity && obj.entity.id === 'posterBoard' ? 1.2 : 0;
+    const maxDist = obj.type === 'door' ? 2.8 : (isCurrentTarget ? 5.0 + posterBoost : 2.55);
     if (dist > maxDist) continue;
     const dir = dist > 0.001 ? ((dx * facing.x + dz * facing.z) / dist) : 1;
-    const minDir = obj.type === 'door' ? 0.08 : (isCurrentTarget ? -0.55 : -0.18);
+    const minDir = obj.type === 'door' ? -0.08 : (isCurrentTarget ? -0.82 : -0.18);
     if (dir < minDir && dist > 1.2) continue;
     const score = dist - (isCurrentTarget ? 0.75 : 0);
     if (score < bestScore) { bestScore = score; best = obj; }
@@ -2494,7 +2602,7 @@ function updatePrompt(){
     promptEl.classList.remove('show');
     return;
   }
-  const kind = obj.type === 'door' ? '移動' : (obj.type === 'npc' ? '話す' : '調べる');
+  const kind = obj.type === 'door' ? '入る / 移動' : (obj.type === 'npc' ? '話す' : '調べる');
   promptEl.textContent = 'E / ACT : ' + obj.label + ' / ' + kind;
   promptEl.classList.add('show');
 }
@@ -2610,6 +2718,7 @@ function updateDoorLatch(){
 function update(){
   updateDoorLatch();
   updatePrompt();
+  updateInteractionMarker();
   updateObjectiveDistance();
   updateMinimap();
   npcs.forEach(updateCharacterBillboard);
