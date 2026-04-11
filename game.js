@@ -520,7 +520,7 @@ const stepDefs = {
   get_breakfast202: { day: 2, phase: '昼勤務', text: '厨房で202号室の朝食膳を受け取る', sub: '厨房へ', targetArea: 'kitchen', targetPos: { x: 0, z: -1 }, trigger: { type: 'item', id: 'breakfastTray' } },
   deliver_202: { day: 2, phase: '昼勤務', text: '202号室へ朝食を運ぶ', sub: '202号室へ', targetArea: 'room202', targetPos: { x: 0, z: -1.8 }, trigger: { type: 'npc', id: 'guest202' } },
   collect_lost_item: { day: 2, phase: '昼勤務', text: '廊下に落ちた鍵束を回収する', sub: '客室廊下へ', targetArea: 'corridor', targetPos: { x: 3.1, z: 1.2 }, trigger: { type: 'item', id: 'lostKey' } },
-  inspect_register: { day: 2, phase: '夕方', text: '帳場で宿帳を照合する', sub: '帳場へ', targetArea: 'lobby', targetPos: { x: 1.2, z: -4.2 }, trigger: { type: 'item', id: 'registerBook' } },
+  inspect_register: { day: 2, phase: '夕方', text: '帳場で宿帳を照合する', sub: '帳場へ', targetArea: 'lobby', targetPos: { x: 1.1, z: -2.95 }, trigger: { type: 'item', id: 'registerBook' } },
   inspect_north: { day: 2, phase: '夕方', text: '北廊下の閉ざされた札を調べる', sub: '北廊下へ', targetArea: 'north', targetPos: { x: 0, z: -2.5 }, trigger: { type: 'item', id: 'sealTag' } },
   inspect_detached: { day: 2, phase: '深夜調査', text: '離れ通路の祠を調べる', sub: '離れ通路へ', targetArea: 'detached', targetPos: { x: 0, z: -3 }, trigger: { type: 'item', id: 'altar' } },
   escape_detached: { day: 2, phase: '深夜追跡', text: '誘導員から逃げて帳場へ戻る', sub: '帳場へ', targetArea: 'lobby', targetPos: { x: 0, z: -2 }, trigger: { type: 'npc', id: 'okami' } },
@@ -530,7 +530,7 @@ const stepDefs = {
   inspect_poster_day3: { day: 3, phase: '朝', text: '町の掲示板の貼り紙を確かめる', sub: '掲示板へ', targetArea: 'town', targetPos: { x: -1.1, z: 1.95 }, trigger: { type: 'item', id: 'posterBoard' } },
   commute_day3: { day: 3, phase: '朝', text: '旅館へ向かう', sub: '旅館入口へ', targetArea: 'town', targetPos: { x: 9.2, z: 0.0 }, trigger: { type: 'door', id: 'townToLobby' } },
   talk_okami_day3: { day: 3, phase: '昼勤務', text: '帳場で女将の指示を聞く', sub: '帳場へ', targetArea: 'lobby', targetPos: { x: 0, z: -2.8 }, trigger: { type: 'npc', id: 'okami' } },
-  inspect_guestbook_203: { day: 3, phase: '昼勤務', text: '帳場で203号室の記録を確かめる', sub: '宿帳へ', targetArea: 'lobby', targetPos: { x: 1.1, z: -4.25 }, trigger: { type: 'item', id: 'registerBook' } },
+  inspect_guestbook_203: { day: 3, phase: '昼勤務', text: '帳場で203号室の記録を確かめる', sub: '宿帳へ', targetArea: 'lobby', targetPos: { x: 1.1, z: -2.95 }, trigger: { type: 'item', id: 'registerBook' } },
   talk_toilet_guest_day3: { day: 3, phase: '夕方', text: '浴場の個室の客にもう一度話しかける', sub: '浴場前へ', targetArea: 'bath', targetPos: { x: 6.15, z: 1.42 }, trigger: { type: 'npc', id: 'toiletGuest' } },
   inspect_bath_notice: { day: 3, phase: '夕方', text: '女湯前の清掃案内を調べる', sub: '女湯前へ', targetArea: 'bath', targetPos: { x: -3.45, z: 2.85 }, trigger: { type: 'item', id: 'bathNotice' } },
   inspect_fire_map: { day: 3, phase: '夜', text: '北廊下で古い避難図を探す', sub: '北廊下へ', targetArea: 'north', targetPos: { x: 1.9, z: -1.2 }, trigger: { type: 'item', id: 'fireMap' } },
@@ -874,7 +874,7 @@ const characterAssets = {
   guide: {
     front: loadAssetTexture('assets/characters/guide_scary_front.png'),
     side: loadAssetTexture('assets/characters/guide_scary_side.png'),
-    portrait: loadAssetTexture('assets/characters/portrait_serious.png')
+    portrait: loadAssetTexture('assets/characters/guide_portrait.png')
   },
   suit: {
     front: loadAssetTexture('assets/characters/suit_front.png'),
@@ -915,7 +915,7 @@ const portraitPaths = {
   guest: 'assets/characters/portrait_serious.png',
   chef: 'assets/characters/portrait_serious.png',
   villager: 'assets/characters/portrait_smile.png',
-  guide: 'assets/characters/portrait_serious.png'
+  guide: 'assets/characters/guide_portrait.png'
 };
 function createBillboardCharacter(faceType, options={}){
   const profile = characterAssets[faceType] || characterAssets.hero;
@@ -2266,9 +2266,15 @@ function buildLobby(){
   blackPhone.position.set(2.2,1.36,-4.35); areaGroup.add(blackPhone);
   const amenityCab = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.4,0.46), new THREE.MeshStandardMaterial({ color: 0x8f7555, roughness: 0.9 })); amenityCab.position.y = 1.28;
   if (state.step === 'stock_amenities') addItem('amenityBag','客用備品袋',-6.12,5.12, amenityCab, itemInteract);
-  const registerBook = new THREE.Mesh(new THREE.BoxGeometry(0.78,0.08,0.54), new THREE.MeshStandardMaterial({ color: 0x31546b, roughness: 0.82 }));
-  registerBook.position.y = 1.36;
-  if (state.step === 'inspect_register' || state.step === 'inspect_guestbook_203') addItem('registerBook','宿帳',1.1,-4.25, registerBook, itemInteract);
+  const registerBookVisual = new THREE.Mesh(new THREE.BoxGeometry(0.78,0.08,0.54), new THREE.MeshStandardMaterial({ color: 0x31546b, roughness: 0.82 }));
+  registerBookVisual.position.set(1.1, 1.36, -4.25);
+  registerBookVisual.castShadow = registerBookVisual.receiveShadow = true;
+  areaGroup.add(registerBookVisual);
+  if (state.step === 'inspect_register' || state.step === 'inspect_guestbook_203') {
+    const registerProxy = new THREE.Mesh(new THREE.CylinderGeometry(0.56,0.56,0.18,18), new THREE.MeshBasicMaterial({ transparent:true, opacity:0.01 }));
+    registerProxy.position.y = 1.0;
+    addItem('registerBook','宿帳',1.1,-2.95, registerProxy, itemInteract);
+  }
   if (state.step === 'choose_fate') {
     const burn = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.06,0.3), new THREE.MeshStandardMaterial({ color: 0x3c2f27, roughness: 1 }));
     burn.position.y = 1.38; addItem('endingBurn','宿帳を燃やす',-0.9,-4.22,burn,itemInteract);
@@ -2963,10 +2969,10 @@ function setStep(id){
 
 function getChaseCheckpoint(areaId, linkedStep){
   if (areaId === 'archive') {
-    return { area: 'archive', x: -1.2, z: 1.6, yaw: Math.PI * 0.18, step: linkedStep, guideSpawn: { x: -5.4, z: -4.1 } };
+    return { area: 'archive', x: -0.9, z: 2.2, yaw: Math.PI * 0.1, step: linkedStep, guideSpawn: { x: -6.6, z: -2.2 } };
   }
   if (areaId === 'detached') {
-    return { area: 'detached', x: 1.9, z: -0.8, yaw: Math.PI * 0.2, step: linkedStep, guideSpawn: { x: 6.3, z: -3.7 } };
+    return { area: 'detached', x: 1.9, z: -0.8, yaw: Math.PI * 0.2, step: linkedStep, guideSpawn: { x: 7.8, z: 0.8 } };
   }
   return { area: areaId, x: player.x, z: player.z, yaw: player.yaw, step: linkedStep, guideSpawn: { x: 0, z: 0 } };
 }
@@ -3012,12 +3018,65 @@ function goHomeNow(){
   state.doorCooldownUntil = performance.now() + 900;
   setStep(state.day >= 2 ? 'sleep_day2' : 'sleep_day1');
 }
+
+function findNearestOpenPoint(x, z, radius=0.3, preferX=null, preferZ=null){
+  const candidates = [];
+  const push = (cx, cz, bias=0) => {
+    if (!collidesAt(cx, cz, radius)) {
+      const dx = preferX == null ? 0 : (cx - preferX);
+      const dz = preferZ == null ? 0 : (cz - preferZ);
+      const pref = preferX == null ? 0 : Math.hypot(dx, dz);
+      candidates.push({ x: cx, z: cz, score: bias + pref * 0.2 + Math.hypot(cx - x, cz - z) });
+    }
+  };
+  push(x, z, 0);
+  const radii = [0.45, 0.8, 1.2, 1.7, 2.2, 2.8];
+  for (const r of radii) {
+    for (let i = 0; i < 16; i++) {
+      const a = (Math.PI * 2 * i) / 16;
+      push(x + Math.cos(a) * r, z + Math.sin(a) * r, r * 0.4);
+    }
+  }
+  if (!candidates.length) return { x, z };
+  candidates.sort((a,b)=>a.score-b.score);
+  return candidates[0];
+}
+
+function recoverGuideFromStuck(){
+  if (!state.guide) return false;
+  const gx = state.guide.group.position.x;
+  const gz = state.guide.group.position.z;
+  const towardX = player.x - gx;
+  const towardZ = player.z - gz;
+  const len = Math.hypot(towardX, towardZ) || 1;
+  const nx = towardX / len, nz = towardZ / len;
+  const candidates = [
+    { x: gx + nx * 1.2, z: gz + nz * 1.2 },
+    { x: gx - nz * 1.4, z: gz + nx * 1.4 },
+    { x: gx + nz * 1.4, z: gz - nx * 1.4 },
+    { x: player.x - nx * 2.1, z: player.z - nz * 2.1 },
+    { x: player.x - nx * 2.8, z: player.z - nz * 2.8 }
+  ];
+  for (const c of candidates) {
+    const open = findNearestOpenPoint(c.x, c.z, state.guide.radius || 0.3, player.x, player.z);
+    if (!collidesAt(open.x, open.z, state.guide.radius || 0.3)) {
+      state.guide.group.position.x = open.x;
+      state.guide.group.position.z = open.z;
+      state.guide.x = open.x;
+      state.guide.z = open.z;
+      state.guide.stuckFor = 0;
+      return true;
+    }
+  }
+  return false;
+}
+
 function spawnGuide(x,z){
   if (state.guide) dynamicGroup.remove(state.guide.group);
   const group = makeCharacter('guide', 0x2f4d7d);
   group.position.set(x,0,z);
   dynamicGroup.add(group);
-  state.guide = { group, x, z, yaw: 0 };
+  state.guide = { group, x, z, yaw: 0, stuckFor: 0, steerSign: Math.random() < 0.5 ? -1 : 1 };
   updateCharacterBillboard(state.guide);
 }
 function triggerGameOver(){
@@ -3049,12 +3108,12 @@ function retryFromCheckpoint(){
   setStep(state.checkpoint.step);
   if (state.step === 'escape_archive') {
     state.chase = { active: true, speed: 2.35, graceUntil: performance.now() + 2200 };
-    const gs = state.checkpoint.guideSpawn || {x:-3.4,z:-1.4};
+    const gs = state.checkpoint.guideSpawn || {x:-4.95,z:-2.2};
     spawnGuide(gs.x, gs.z);
   }
   if (state.step === 'escape_detached') {
     state.chase = { active: true, speed: 2.35, graceUntil: performance.now() + 2200 };
-    const gs = state.checkpoint.guideSpawn || {x:0,z:-2.8};
+    const gs = state.checkpoint.guideSpawn || {x:5.3,z:-2.6};
     spawnGuide(gs.x, gs.z);
   }
 }
@@ -3273,6 +3332,7 @@ function attemptEntityMove(entity, nx, nz, radius=0.32){
   }
   entity.x = entity.group.position.x;
   entity.z = entity.group.position.z;
+  return Math.hypot(entity.x - ox, entity.z - oz);
 }
 
 function updateChase(dt){
@@ -3285,9 +3345,36 @@ function updateChase(dt){
     return;
   }
   const move = Math.min(state.chase.speed * dt, dist * 0.92);
-  const nx = gx + (dx / Math.max(.001, dist)) * move;
-  const nz = gz + (dz / Math.max(.001, dist)) * move;
-  attemptEntityMove(state.guide, nx, nz, 0.34);
+  const dirX = dx / Math.max(.001, dist);
+  const dirZ = dz / Math.max(.001, dist);
+  const guideRadius = state.guide.radius || 0.3;
+  let moved = attemptEntityMove(state.guide, gx + dirX * move, gz + dirZ * move, guideRadius);
+
+  if (moved < 0.002) {
+    const perpX = -dirZ;
+    const perpZ = dirX;
+    const sign = state.guide.steerSign || 1;
+    moved = attemptEntityMove(state.guide, gx + perpX * move * sign, gz + perpZ * move * sign, guideRadius);
+    if (moved < 0.002) {
+      moved = attemptEntityMove(state.guide, gx - perpX * move * sign, gz - perpZ * move * sign, guideRadius);
+      if (moved > 0.002) state.guide.steerSign = -sign;
+    }
+  }
+
+  if (moved < 0.002) {
+    state.guide.stuckFor = (state.guide.stuckFor || 0) + dt;
+    if (state.guide.stuckFor > 0.45) {
+      state.guide.steerSign = -(state.guide.steerSign || 1);
+    }
+    if (state.guide.stuckFor > 1.05) {
+      recoverGuideFromStuck();
+      state.guide.steerSign = Math.random() < 0.5 ? -1 : 1;
+      state.guide.stuckFor = 0;
+    }
+  } else {
+    state.guide.stuckFor = 0;
+  }
+
   state.guide.group.rotation.y = Math.atan2(dx, dz);
 }
 
@@ -3406,12 +3493,12 @@ function loadFromSlot(slot, silent){
     state.doorCooldownUntil = performance.now() + 600;
     if (data.chaseStep === 'escape_archive' && state.checkpoint) {
       state.step = 'escape_archive';
-      const gs=(state.checkpoint.guideSpawn)||{x:-3.4,z:-1.4};
+      const gs=(state.checkpoint.guideSpawn)||{x:-6.6,z:-2.2};
       state.chase={active:true,speed:2.35,graceUntil:performance.now()+2400};
       spawnGuide(gs.x,gs.z);
     } else if (data.chaseStep === 'escape_detached' && state.checkpoint) {
       state.step = 'escape_detached';
-      const gs=(state.checkpoint.guideSpawn)||{x:0,z:-2.8};
+      const gs=(state.checkpoint.guideSpawn)||{x:7.8,z:0.8};
       state.chase={active:true,speed:2.35,graceUntil:performance.now()+2400};
       spawnGuide(gs.x,gs.z);
     }

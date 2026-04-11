@@ -56,3 +56,9 @@
 - 女将の登場位置と歩行経路を修正し、ドアで詰まりにくく改善
 - お仕事パートで使う物品の配置を通路から外した
 - 非対象アイテムの吸着距離を少し短くして誤反応を軽減
+
+
+## B27
+- Fixed Day 3 register ACT prompt with front-side interaction proxy.
+- Improved second chase unstuck logic and safer guide spawn points.
+- Updated guide portrait asset binding.
