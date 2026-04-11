@@ -2062,6 +2062,43 @@ function buildTown(){
   areaGroup.add(house);
   addBoxCollider(-12.4, 0, 5.1, 4.0);
 
+  const homeEntry = new THREE.Group();
+  const homePorch = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.16, 2.2), materials.darkWood);
+  homePorch.position.set(-9.15, 0.08, 0);
+  homePorch.receiveShadow = true;
+  homePorch.castShadow = true;
+  homeEntry.add(homePorch);
+  const homeStep = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 0.8), new THREE.MeshStandardMaterial({ color: 0x8a7763, roughness: 1 }));
+  homeStep.position.set(-8.55, 0.04, 0);
+  homeEntry.add(homeStep);
+  const homeFrameL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.0, 0.22), materials.darkWood);
+  const homeFrameR = homeFrameL.clone();
+  homeFrameL.position.set(-10.02, 1.0, -0.48);
+  homeFrameR.position.set(-10.02, 1.0, 0.48);
+  homeEntry.add(homeFrameL, homeFrameR);
+  const homeTop = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 1.18), materials.darkWood);
+  homeTop.position.set(-10.02, 1.98, 0);
+  homeTop.rotation.z = Math.PI / 2;
+  homeEntry.add(homeTop);
+  const homeDoor = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.78, 0.9), new THREE.MeshStandardMaterial({ color: 0xe8dcc5, roughness: 1 }));
+  homeDoor.position.set(-9.96, 0.94, 0);
+  homeEntry.add(homeDoor);
+  const homeKnob = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 12), materials.brass);
+  homeKnob.position.set(-9.9, 1.0, 0.2);
+  homeEntry.add(homeKnob);
+  const homeLamp = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.32, 0.14), new THREE.MeshStandardMaterial({ color: 0xf5efe0, emissive: 0x7d5b2a, emissiveIntensity: 0.15, roughness: 1 }));
+  homeLamp.position.set(-9.84, 1.72, -0.78);
+  homeEntry.add(homeLamp);
+  const homePlate = makeTextPlane('自宅', 0.92, 0.2, { fg:'#f2ead8', bg:'rgba(0,0,0,.32)', fontSize:84 });
+  homePlate.position.set(-9.2, 1.95, 0.0);
+  homePlate.rotation.y = -Math.PI / 2;
+  homeEntry.add(homePlate);
+  homeEntry.traverse(m => { if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; }});
+  areaGroup.add(homeEntry);
+  addFloorShadow(-9.25, 0.0, 2.1, 1.6, 0.16);
+  addLamp(-9.0, 0.0, 0.18, 0xffe1b8);
+  addDoor('townToHome','自宅へ戻る',-9.05,0.0,1.9,'home',{x:3.18,z:1.02,yaw:-Math.PI/2},'x',0xd8c7aa);
+
   const inn = new THREE.Group();
   const main = new THREE.Mesh(new THREE.BoxGeometry(8.4, 3.0, 6.8), new THREE.MeshStandardMaterial({ color: 0xd7c6aa, roughness: 1 }));
   main.position.set(0,1.5,0); main.castShadow = true; main.receiveShadow = true; inn.add(main);
@@ -2313,7 +2350,7 @@ function buildCorridor(){
   const sideRailB = sideRailA.clone(); sideRailB.position.z = 4.22; areaGroup.add(sideRailB);
 
   addDoor('corridorToLobby','帳場',-11.84,0,1.2,'lobby',{x:7.05,z:0,yaw:Math.PI},'x');
-  addDoor('corridorToNorth','北廊下',11.84,0,1.2,'north',{x:-7.35,z:0,yaw:0},'x',0xc3b28a);
+  addDoor('corridorToNorth','北廊下',11.84,0,1.2,'north',{x:-7.05,z:1.05,yaw:0},'x',0xc3b28a);
   addDoor('corridorTo201','201',0,-4.69,1.25,'room201',{x:0,z:3.88,yaw:Math.PI},null,0xf0e7d1,{style:'fusuma'});
   addDoor('corridorTo202','202',4.8,-4.69,1.25,'room202',{x:0,z:3.88,yaw:Math.PI},null,0xeaddcd,{style:'fusuma'});
   addDoor('corridorToBath','男湯',8.9,4.02,1.3,'bath',{x:-5.25,z:0,yaw:0},null,0xd7ecef,{style:'noren', clothColor:0x2a3f53, subLabel:'MEN'});
@@ -2534,11 +2571,11 @@ function buildBath(){
 function buildArchive(){
   createFloor(18, 14, materials.tile, -0.1);
   createCeiling(18, 14, 0xd6d3cf);
-  scene.fog.color.set(0x131419);
-  scene.fog.near = 14;
-  scene.fog.far = 34;
-  hemi.intensity = 0.56;
-  dirLight.intensity = 0.34;
+  scene.fog.color.set(0x1d1d22);
+  scene.fog.near = 18;
+  scene.fog.far = 46;
+  hemi.intensity = 0.8;
+  dirLight.intensity = 0.46;
   wallSegment(0,-6.95,18,3.2,0.14,materials.wallDark); wallSegment(0,6.95,18,3.2,0.14,materials.wallDark); wallSegment(-8.95,0,0.14,3.2,14,materials.wallDark); wallSegment(8.95,0,0.14,3.2,14,materials.wallDark);
   addDoor('archiveToLobby','帳場',8.78,4.8,1.15,'lobby',{x:-6.95,z:-3.55,yaw:0},'x',0xb7b39b);
   addDoor('archiveToDetached','離れ通路',0,-6.55,1.15,'detached',{x:0,z:6.1,yaw:0},null,0x9689a6);
@@ -2563,9 +2600,12 @@ function buildArchive(){
   wallSegment(-0.8,2.45,2.6,2.6,0.14,materials.wallDark);
   wallSegment(2.4,2.45,2.6,2.6,0.14,materials.wallDark);
   wallSegment(5.6,2.45,2.6,2.6,0.14,materials.wallDark);
-  addLamp(6.8,4.6,0.56,0xffd7a8); addLamp(0,4.6,0.48,0xffd7a8); addLamp(-6.8,4.6,0.52,0xffd7a8);
-  addLamp(6.8,-2.8,0.42,0xffcca0); addLamp(-6.6,-2.8,0.42,0xffcca0);
-  addWallGlow(0,1.4,-6.82,16.4,1.9,0,0x1a1512,0.11);
+  addLamp(6.8,4.6,0.66,0xffd7a8); addLamp(0,4.6,0.56,0xffd7a8); addLamp(-6.8,4.6,0.6,0xffd7a8);
+  addLamp(6.8,-2.8,0.5,0xffcca0); addLamp(-6.6,-2.8,0.5,0xffcca0);
+  addLamp(-0.3,0.2,0.18,0xffc58e);
+  addMoodLight(-4.8, 1.55, -1.2, 0xffcf9c, 0.14, 6.2);
+  addMoodLight(3.2, 1.55, 1.4, 0xffcf9c, 0.14, 6.2);
+  addWallGlow(0,1.4,-6.82,16.4,1.9,0,0x2b211a,0.09);
   addBackdropPlane(realismAssets.forbidden, 0, 1.7, -6.7, 16.0, 3.2, 0, 0.46);
   const ledger = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.16,0.48), new THREE.MeshStandardMaterial({ color: 0x225688, roughness: 0.85 }));
   ledger.position.y = 1.12;
@@ -2582,11 +2622,11 @@ function buildArchive(){
 function buildNorth(){
   createFloor(18, 14, materials.carpet, -0.1);
   createCeiling(18, 14, 0xd4c4ae);
-  scene.fog.color.set(0x18171a);
-  scene.fog.near = 15;
-  scene.fog.far = 38;
-  hemi.intensity = 0.66;
-  dirLight.intensity = 0.42;
+  scene.fog.color.set(0x211f22);
+  scene.fog.near = 18;
+  scene.fog.far = 52;
+  hemi.intensity = 0.9;
+  dirLight.intensity = 0.56;
   wallSegment(0,-6.95,18,3.2,0.14,materials.wallDark); wallSegment(0,6.95,18,3.2,0.14,materials.wallDark); wallSegment(-8.95,0,0.14,3.2,14,materials.wallDark); wallSegment(8.95,0,0.14,3.2,14,materials.wallDark);
   // maze-like side partitions
   wallSegment(-3.8,-2.4,0.18,3.2,6.8,materials.darkWood);
@@ -2604,8 +2644,12 @@ function buildNorth(){
   for (const [x,z,scale] of [[-7.4,5.2,0.84],[-4.2,5.05,0.78],[-0.6,5.1,0.76],[3.1,5.1,0.8],[6.8,5.05,0.82],[-6.7,-5.0,0.8],[-2.6,-5.0,0.76],[1.8,-5.0,0.78],[5.9,-5.0,0.8]]) {
     addAndonLamp(x,z,scale);
   }
-  addMoodLight(-6.8, 1.7, 0.0, 0xffd9a8, 0.22, 7.8);
-  addMoodLight(2.4, 1.75, -0.8, 0xffd9a8, 0.18, 7.0);
+  addLamp(-5.4, 0.0, 0.18, 0xffd6a6);
+  addLamp(-1.2, 0.2, 0.16, 0xffd6a6);
+  addLamp(3.0, -0.4, 0.16, 0xffd6a6);
+  addMoodLight(-6.8, 1.7, 0.0, 0xffd9a8, 0.26, 9.0);
+  addMoodLight(2.4, 1.75, -0.8, 0xffd9a8, 0.22, 8.0);
+  addMoodLight(5.8, 1.68, 3.8, 0xffcf98, 0.16, 5.5);
   addBambooPlant(-7.2, 5.35, 0.95); addBambooPlant(1.2, 5.1, 0.88); addIkebana(4.8, -5.1, 0.76);
   addUmbrellaStand(-7.6, -5.1, 0.68, Math.PI/2);
   addFloorShadow(0,0,16.8,2.4,0.1);
@@ -2626,8 +2670,8 @@ function buildNorth(){
 function buildDetached(){
   createFloor(20, 14, materials.wood, -0.1);
   createCeiling(20, 14, 0x1d2235);
-  scene.fog.color.set(0x12151d); scene.fog.near = 13; scene.fog.far = 34;
-  hemi.intensity = 0.42; dirLight.intensity = 0.24;
+  scene.fog.color.set(0x191c24); scene.fog.near = 16; scene.fog.far = 44;
+  hemi.intensity = 0.64; dirLight.intensity = 0.36;
   wallSegment(0,-6.95,20,3.2,0.14,materials.wallDark); wallSegment(0,6.95,20,3.2,0.14,materials.wallDark); wallSegment(-9.95,0,0.14,3.2,14,materials.wallDark); wallSegment(9.95,0,0.14,3.2,14,materials.wallDark);
   // broken hidden-passage maze
   wallSegment(-6.5,2.0,0.18,3.2,10.2,materials.darkWood);
@@ -2648,8 +2692,11 @@ function buildDetached(){
   addBackdropPlane(realismAssets.forbidden, 7.8, 1.7, -6.7, 4.4, 3.1, 0, 0.45);
   addWallGlow(0,1.4,6.82,18.6,1.9,Math.PI,0x24304a,0.06);
   addWallGlow(0,1.2,-6.82,18.6,1.9,0,0x100d0d,0.18);
-  for (const [x,z] of [[-8.2,4.8],[-4.4,4.9],[-0.3,5.0],[3.6,4.8],[7.8,4.9],[-7.4,-5.0],[-2.2,-4.9],[2.4,-5.0]]) addLamp(x,z,0.28,0x9cb2d4);
-  addMoodLight(-1.0, 1.55, 0.0, 0x9eb6d6, 0.12, 6.5);
+  for (const [x,z] of [[-8.2,4.8],[-4.4,4.9],[-0.3,5.0],[3.6,4.8],[7.8,4.9],[-7.4,-5.0],[-2.2,-4.9],[2.4,-5.0]]) addLamp(x,z,0.38,0x9cb2d4);
+  addLamp(6.2,-2.2,0.22,0xb8c9e8);
+  addLamp(-5.8,0.6,0.18,0xb8c9e8);
+  addMoodLight(-1.0, 1.55, 0.0, 0x9eb6d6, 0.18, 7.8);
+  addMoodLight(4.8, 1.4, -3.0, 0xc0d0ea, 0.12, 4.8);
   addFloorShadow(0,0,18.4,3.4,0.08);
   const debrisMat = new THREE.MeshStandardMaterial({ color: 0x5d4b3e, roughness: 1 });
   for (const [x,z,w,d,r] of [[-5.1,-0.9,1.2,0.22,0.25],[-1.2,1.6,0.8,0.2,-0.35],[4.2,-1.8,1.4,0.18,0.4],[6.4,2.1,0.9,0.18,-0.18]]) {
@@ -2916,10 +2963,10 @@ function setStep(id){
 
 function getChaseCheckpoint(areaId, linkedStep){
   if (areaId === 'archive') {
-    return { area: 'archive', x: 7.2, z: 4.8, yaw: Math.PI * 0.94, step: linkedStep, guideSpawn: { x: -5.6, z: -4.4 } };
+    return { area: 'archive', x: -1.2, z: 1.6, yaw: Math.PI * 0.18, step: linkedStep, guideSpawn: { x: -5.4, z: -4.1 } };
   }
   if (areaId === 'detached') {
-    return { area: 'detached', x: -7.6, z: 4.2, yaw: Math.PI * 0.72, step: linkedStep, guideSpawn: { x: 6.3, z: -3.7 } };
+    return { area: 'detached', x: 1.9, z: -0.8, yaw: Math.PI * 0.2, step: linkedStep, guideSpawn: { x: 6.3, z: -3.7 } };
   }
   return { area: areaId, x: player.x, z: player.z, yaw: player.yaw, step: linkedStep, guideSpawn: { x: 0, z: 0 } };
 }
@@ -2939,6 +2986,7 @@ function startChase(areaId, guidePos, linkedStep){
   resetInput();
   state.chase = { active: true, speed: 2.35, graceUntil: performance.now() + 2200 };
   spawnGuide(cp.guideSpawn.x, cp.guideSpawn.z);
+  refreshAmbience(true);
 }
 function stopChase(){
   state.chase = null;
@@ -3193,19 +3241,38 @@ function movePlayer(dt){
   const dz = (-sin * nx - cos * nz) * speed;
   attemptMove(player.x + dx, player.z + dz);
 }
+function collidesAt(x, z, r){
+  for (const c of colliders) {
+    if (x + r > c.x1 && x - r < c.x2 && z + r > c.z1 && z - r < c.z2) return true;
+  }
+  return false;
+}
 function attemptMove(nx, nz){
   const r = player.radius;
-  for (const c of colliders) {
-    if (nx + r > c.x1 && nx - r < c.x2 && nz + r > c.z1 && nz - r < c.z2) {
-      // try slide X only
-      const clearX = !(nx + r > c.x1 && nx - r < c.x2 && player.z + r > c.z1 && player.z - r < c.z2);
-      const clearZ = !(player.x + r > c.x1 && player.x - r < c.x2 && nz + r > c.z1 && nz - r < c.z2);
-      if (clearX) { player.x = nx; return; }
-      if (clearZ) { player.z = nz; return; }
-      return;
-    }
+  if (!collidesAt(nx, nz, r)) {
+    player.x = nx;
+    player.z = nz;
+    return;
   }
-  player.x = nx; player.z = nz;
+  const clearX = !collidesAt(nx, player.z, r);
+  const clearZ = !collidesAt(player.x, nz, r);
+  if (clearX) { player.x = nx; return; }
+  if (clearZ) { player.z = nz; return; }
+}
+function attemptEntityMove(entity, nx, nz, radius=0.32){
+  const ox = entity.group.position.x;
+  const oz = entity.group.position.z;
+  if (!collidesAt(nx, nz, radius)) {
+    entity.group.position.x = nx;
+    entity.group.position.z = nz;
+  } else {
+    const clearX = !collidesAt(nx, oz, radius);
+    const clearZ = !collidesAt(ox, nz, radius);
+    if (clearX) entity.group.position.x = nx;
+    if (clearZ) entity.group.position.z = nz;
+  }
+  entity.x = entity.group.position.x;
+  entity.z = entity.group.position.z;
 }
 
 function updateChase(dt){
@@ -3218,8 +3285,9 @@ function updateChase(dt){
     return;
   }
   const move = Math.min(state.chase.speed * dt, dist * 0.92);
-  state.guide.group.position.x += (dx / Math.max(.001, dist)) * move;
-  state.guide.group.position.z += (dz / Math.max(.001, dist)) * move;
+  const nx = gx + (dx / Math.max(.001, dist)) * move;
+  const nz = gz + (dz / Math.max(.001, dist)) * move;
+  attemptEntityMove(state.guide, nx, nz, 0.34);
   state.guide.group.rotation.y = Math.atan2(dx, dz);
 }
 
