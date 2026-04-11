@@ -6,6 +6,7 @@ if (typeof THREE === 'undefined') {
 }
 
 const SAVE_PREFIX = 'yoiyado_b1_smartphone_slot_';
+const SOUND_PREF_KEY = 'yoiyado_b24_sound_muted';
 const TAU = Math.PI * 2;
 
 const canvas = document.getElementById('game-canvas');
@@ -34,6 +35,7 @@ const slotListEl = document.getElementById('slot-list');
 const returnHomeEl = document.getElementById('return-home');
 const actBtn = document.getElementById('act-btn');
 const runBtn = document.getElementById('run-btn');
+const soundBtn = document.getElementById('sound-btn');
 const lookZone = document.getElementById('look-zone');
 const joystickBase = document.getElementById('joystick-base');
 const joystickKnob = document.getElementById('joystick-knob');
@@ -111,6 +113,349 @@ const input = {
   runToggle: false
 };
 
+const audioState = {
+  ctx: null,
+  master: null,
+  noiseBuffer: null,
+  enabled: false,
+  muted: (function(){ try { return localStorage.getItem(SOUND_PREF_KEY) === '1'; } catch (e) { return false; } })(),
+  ambienceKey: '',
+  ambienceNodes: [],
+  lastAreaFxAt: Object.create(null),
+  stepAccum: 0,
+  prevX: 0,
+  prevZ: 0
+};
+
+function audioNow(){ return audioState.ctx ? audioState.ctx.currentTime : 0; }
+function setMasterVolume(){
+  if (!audioState.master || !audioState.ctx) return;
+  const t = audioState.ctx.currentTime;
+  audioState.master.gain.cancelScheduledValues(t);
+  audioState.master.gain.setTargetAtTime(audioState.muted ? 0 : 0.82, t, 0.03);
+}
+function updateSoundButton(){
+  if (!soundBtn) return;
+  soundBtn.textContent = audioState.muted ? 'SOUND OFF' : 'SOUND ON';
+}
+function createNoiseBuffer(ctx, duration){
+  const length = Math.max(1, Math.floor(ctx.sampleRate * duration));
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (0.6 + Math.random() * 0.4);
+  return buffer;
+}
+function unlockAudio(){
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  if (!audioState.ctx) {
+    const ctx = new AudioCtx();
+    const master = ctx.createGain();
+    master.gain.value = audioState.muted ? 0 : 0.82;
+    master.connect(ctx.destination);
+    audioState.ctx = ctx;
+    audioState.master = master;
+    audioState.noiseBuffer = createNoiseBuffer(ctx, 2.4);
+  }
+  if (audioState.ctx.state === 'suspended') {
+    audioState.ctx.resume().catch(()=>{});
+  }
+  audioState.enabled = true;
+  setMasterVolume();
+  updateSoundButton();
+}
+function makeGain(value){
+  const g = audioState.ctx.createGain();
+  g.gain.value = value;
+  g.connect(audioState.master);
+  return g;
+}
+function playTone(opts){
+  unlockAudio();
+  if (!audioState.ctx || audioState.muted) return;
+  const o = opts || {};
+  const t = audioState.ctx.currentTime + (o.delay || 0);
+  const osc = audioState.ctx.createOscillator();
+  const gain = audioState.ctx.createGain();
+  osc.type = o.type || 'sine';
+  osc.frequency.setValueAtTime(o.freq || 440, t);
+  if (typeof o.freqTo === 'number') osc.frequency.linearRampToValueAtTime(o.freqTo, t + (o.dur || 0.18));
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(o.gain || 0.05, t + (o.attack || 0.01));
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + (o.dur || 0.18));
+  let endNode = gain;
+  if (typeof o.pan === 'number' && audioState.ctx.createStereoPanner) {
+    const pan = audioState.ctx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, o.pan));
+    gain.connect(pan);
+    pan.connect(audioState.master);
+    endNode = pan;
+  } else {
+    gain.connect(audioState.master);
+  }
+  osc.connect(gain);
+  osc.start(t);
+  osc.stop(t + (o.dur || 0.18) + 0.05);
+}
+function playNoiseBurst(opts){
+  unlockAudio();
+  if (!audioState.ctx || !audioState.noiseBuffer || audioState.muted) return;
+  const o = opts || {};
+  const t = audioState.ctx.currentTime + (o.delay || 0);
+  const src = audioState.ctx.createBufferSource();
+  src.buffer = audioState.noiseBuffer;
+  const filter = audioState.ctx.createBiquadFilter();
+  filter.type = o.filterType || 'bandpass';
+  filter.frequency.value = o.freq || 1200;
+  filter.Q.value = o.q || 0.8;
+  const gain = audioState.ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(o.gain || 0.04, t + (o.attack || 0.01));
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + (o.dur || 0.18));
+  let endNode = gain;
+  if (typeof o.pan === 'number' && audioState.ctx.createStereoPanner) {
+    const pan = audioState.ctx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, o.pan));
+    gain.connect(pan);
+    pan.connect(audioState.master);
+    endNode = pan;
+  } else {
+    gain.connect(audioState.master);
+  }
+  src.connect(filter);
+  filter.connect(gain);
+  src.start(t);
+  src.stop(t + (o.dur || 0.18) + 0.05);
+}
+function stopAmbience(){
+  if (!audioState.ambienceNodes.length) return;
+  audioState.ambienceNodes.forEach(node => {
+    try { node.stop?.(); } catch (e) {}
+    try { node.disconnect?.(); } catch (e) {}
+  });
+  audioState.ambienceNodes = [];
+  audioState.ambienceKey = '';
+}
+function addAmbienceNoise(level, filterType, freq, q){
+  const src = audioState.ctx.createBufferSource();
+  src.buffer = audioState.noiseBuffer;
+  src.loop = true;
+  const filter = audioState.ctx.createBiquadFilter();
+  filter.type = filterType;
+  filter.frequency.value = freq;
+  filter.Q.value = q || 0.7;
+  const gain = makeGain(level);
+  src.connect(filter);
+  filter.connect(gain);
+  src.start();
+  audioState.ambienceNodes.push(src, filter, gain);
+}
+function addAmbienceTone(type, freq, level){
+  const osc = audioState.ctx.createOscillator();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const gain = makeGain(level);
+  osc.connect(gain);
+  osc.start();
+  audioState.ambienceNodes.push(osc, gain);
+}
+function refreshAmbience(force){
+  if (!audioState.ctx || !audioState.enabled) return;
+  const key = state.area + ':' + (state.chase ? 'chase' : 'idle');
+  if (!force && key === audioState.ambienceKey) return;
+  stopAmbience();
+  audioState.ambienceKey = key;
+  if (state.chase) {
+    addAmbienceTone('sawtooth', 62, 0.009);
+    addAmbienceNoise(0.018, 'lowpass', 420, 0.45);
+    return;
+  }
+  switch (state.area) {
+    case 'town':
+      addAmbienceNoise(0.012, 'bandpass', 950, 0.55);
+      addAmbienceTone('sine', 140, 0.0028);
+      break;
+    case 'lobby':
+    case 'corridor':
+    case 'room201':
+    case 'room202':
+      addAmbienceNoise(0.0085, 'lowpass', 360, 0.7);
+      addAmbienceTone('triangle', 86, 0.0023);
+      break;
+    case 'bath':
+      addAmbienceNoise(0.011, 'lowpass', 520, 0.65);
+      addAmbienceTone('sine', 118, 0.0028);
+      break;
+    case 'archive':
+      addAmbienceNoise(0.0105, 'bandpass', 270, 0.9);
+      addAmbienceTone('sine', 64, 0.003);
+      break;
+    case 'north':
+      addAmbienceNoise(0.0105, 'lowpass', 430, 0.6);
+      addAmbienceTone('triangle', 96, 0.0025);
+      break;
+    case 'detached':
+      addAmbienceNoise(0.013, 'bandpass', 240, 0.8);
+      addAmbienceTone('sine', 55, 0.0032);
+      break;
+    default:
+      addAmbienceNoise(0.007, 'lowpass', 380, 0.7);
+      break;
+  }
+}
+function setAudioMuted(nextMuted){
+  audioState.muted = !!nextMuted;
+  try { localStorage.setItem(SOUND_PREF_KEY, audioState.muted ? '1' : '0'); } catch (e) {}
+  unlockAudio();
+  setMasterVolume();
+  updateSoundButton();
+}
+function areaStepSoundId(){
+  switch (state.area) {
+    case 'town': return 'step_outdoor';
+    case 'bath': return 'step_tile';
+    case 'archive':
+    case 'detached': return 'step_oldwood';
+    default: return 'step_wood';
+  }
+}
+function playSfx(id){
+  unlockAudio();
+  if (!audioState.ctx || audioState.muted) return;
+  switch (id) {
+    case 'ui_tap':
+      playTone({ freq: 660, freqTo: 520, dur: 0.08, gain: 0.03, type: 'triangle' });
+      break;
+    case 'dialogue_tick':
+      playTone({ freq: 520, freqTo: 420, dur: 0.07, gain: 0.026, type: 'triangle' });
+      break;
+    case 'paper':
+      playNoiseBurst({ dur: 0.14, gain: 0.032, freq: 3200, q: 0.8, filterType: 'bandpass' });
+      break;
+    case 'door_slide':
+      playNoiseBurst({ dur: 0.22, gain: 0.036, freq: 850, q: 0.7, filterType: 'bandpass' });
+      playTone({ freq: 230, freqTo: 170, dur: 0.18, gain: 0.024, type: 'triangle' });
+      break;
+    case 'door_noren':
+      playNoiseBurst({ dur: 0.18, gain: 0.026, freq: 1800, q: 0.5, filterType: 'bandpass' });
+      break;
+    case 'door_open':
+      playTone({ freq: 180, freqTo: 120, dur: 0.16, gain: 0.026, type: 'triangle' });
+      playNoiseBurst({ dur: 0.12, gain: 0.022, freq: 900, q: 0.6, filterType: 'bandpass', delay: 0.03 });
+      break;
+    case 'metal_rattle':
+      playTone({ freq: 960, freqTo: 720, dur: 0.08, gain: 0.024, type: 'square' });
+      playTone({ freq: 740, freqTo: 560, dur: 0.1, gain: 0.02, type: 'square', delay: 0.045 });
+      playNoiseBurst({ dur: 0.12, gain: 0.022, freq: 2600, q: 1.5, filterType: 'highpass' });
+      break;
+    case 'knock_metal':
+      playTone({ freq: 250, freqTo: 160, dur: 0.12, gain: 0.032, type: 'triangle' });
+      playTone({ freq: 230, freqTo: 150, dur: 0.12, gain: 0.028, type: 'triangle', delay: 0.19 });
+      playNoiseBurst({ dur: 0.08, gain: 0.015, freq: 1400, q: 1.0, filterType: 'bandpass', delay: 0.01 });
+      playNoiseBurst({ dur: 0.08, gain: 0.015, freq: 1400, q: 1.0, filterType: 'bandpass', delay: 0.20 });
+      break;
+    case 'water_drop':
+      playTone({ freq: 950, freqTo: 420, dur: 0.12, gain: 0.022, type: 'sine' });
+      playNoiseBurst({ dur: 0.06, gain: 0.01, freq: 1500, q: 1.2, filterType: 'bandpass', delay: 0.04 });
+      break;
+    case 'phone_pickup':
+      playTone({ freq: 480, freqTo: 360, dur: 0.12, gain: 0.03, type: 'square' });
+      break;
+    case 'note_pickup':
+      playNoiseBurst({ dur: 0.12, gain: 0.028, freq: 2500, q: 0.8, filterType: 'bandpass' });
+      playTone({ freq: 700, freqTo: 520, dur: 0.12, gain: 0.02, type: 'triangle' });
+      break;
+    case 'scare_sting':
+      playTone({ freq: 130, freqTo: 70, dur: 0.28, gain: 0.05, type: 'sawtooth' });
+      playNoiseBurst({ dur: 0.24, gain: 0.04, freq: 800, q: 0.7, filterType: 'bandpass' });
+      break;
+    case 'chase_start':
+      playTone({ freq: 180, freqTo: 90, dur: 0.22, gain: 0.05, type: 'sawtooth' });
+      playTone({ freq: 340, freqTo: 180, dur: 0.16, gain: 0.024, type: 'triangle', delay: 0.04 });
+      break;
+    case 'game_over':
+      playTone({ freq: 120, freqTo: 44, dur: 0.55, gain: 0.06, type: 'sawtooth' });
+      playNoiseBurst({ dur: 0.24, gain: 0.026, freq: 600, q: 0.6, filterType: 'bandpass' });
+      break;
+    case 'sleep':
+      playTone({ freq: 280, freqTo: 180, dur: 0.22, gain: 0.024, type: 'sine' });
+      break;
+    case 'lantern_buzz':
+      playTone({ freq: 420, freqTo: 390, dur: 0.18, gain: 0.014, type: 'triangle' });
+      playNoiseBurst({ dur: 0.12, gain: 0.01, freq: 2400, q: 1.1, filterType: 'highpass' });
+      break;
+    case 'distant_step':
+      playTone({ freq: 150, freqTo: 100, dur: 0.1, gain: 0.015, type: 'triangle', pan: 0.3 - Math.random() * 0.6 });
+      playNoiseBurst({ dur: 0.08, gain: 0.008, freq: 600, q: 0.7, filterType: 'bandpass', pan: 0.3 - Math.random() * 0.6 });
+      break;
+    case 'stall_slam':
+      playTone({ freq: 165, freqTo: 80, dur: 0.16, gain: 0.04, type: 'triangle' });
+      playNoiseBurst({ dur: 0.09, gain: 0.02, freq: 1200, q: 0.8, filterType: 'bandpass' });
+      break;
+    case 'ending':
+      playTone({ freq: 360, freqTo: 210, dur: 0.4, gain: 0.03, type: 'sine' });
+      break;
+    case 'step_oldwood':
+      playTone({ freq: 110, freqTo: 72, dur: 0.08, gain: 0.013, type: 'triangle' });
+      playNoiseBurst({ dur: 0.06, gain: 0.006, freq: 700, q: 0.6, filterType: 'bandpass' });
+      break;
+    case 'step_tile':
+      playTone({ freq: 200, freqTo: 140, dur: 0.07, gain: 0.01, type: 'sine' });
+      playNoiseBurst({ dur: 0.05, gain: 0.006, freq: 1800, q: 0.9, filterType: 'highpass' });
+      break;
+    case 'step_outdoor':
+      playTone({ freq: 140, freqTo: 94, dur: 0.07, gain: 0.009, type: 'triangle' });
+      playNoiseBurst({ dur: 0.05, gain: 0.006, freq: 900, q: 0.9, filterType: 'bandpass' });
+      break;
+    case 'step_wood':
+    default:
+      playTone({ freq: 125, freqTo: 82, dur: 0.08, gain: 0.011, type: 'triangle' });
+      playNoiseBurst({ dur: 0.05, gain: 0.006, freq: 950, q: 0.8, filterType: 'bandpass' });
+      break;
+  }
+}
+function maybeTriggerAreaAudio(now, dt){
+  if (!audioState.ctx || audioState.muted || state.menuOpen || !dialogueOverlay.classList.contains('hidden')) return;
+  const moved = Math.hypot(player.x - audioState.prevX, player.z - audioState.prevZ);
+  const running = !!(input.keys.ShiftLeft || input.runHeld || input.runToggle);
+  if (moved > 0.0004) {
+    audioState.stepAccum += moved;
+    const threshold = running ? 1.05 : 0.74;
+    if (audioState.stepAccum >= threshold) {
+      audioState.stepAccum = 0;
+      playSfx(areaStepSoundId());
+    }
+  } else {
+    audioState.stepAccum = Math.min(audioState.stepAccum, 0.18);
+  }
+  audioState.prevX = player.x;
+  audioState.prevZ = player.z;
+
+  const last = audioState.lastAreaFxAt;
+  if (state.area === 'lobby' && Math.hypot(player.x - 5.6, player.z + 6.1) < 4.2) {
+    if (now - (last.lobbyKnock || 0) > 20000 && Math.random() < dt * 0.22) { last.lobbyKnock = now; playSfx('knock_metal'); }
+  }
+  if (state.area === 'bath' && now - (last.bathDrip || 0) > 8000 && Math.random() < dt * 0.35) { last.bathDrip = now; playSfx('water_drop'); }
+  if (state.area === 'north' && now - (last.northFx || 0) > 11000 && Math.random() < dt * 0.32) {
+    last.northFx = now;
+    if (Math.random() < 0.55) playSfx('lantern_buzz');
+    else playSfx('distant_step');
+  }
+  if ((state.area === 'archive' || state.area === 'detached') && now - (last.archiveFx || 0) > 9000 && Math.random() < dt * 0.3) {
+    last.archiveFx = now;
+    if (Math.random() < 0.5) playSfx('distant_step');
+    else playSfx('metal_rattle');
+  }
+  if (state.area === 'town' && now - (last.townWind || 0) > 12000 && Math.random() < dt * 0.28) {
+    last.townWind = now;
+    playNoiseBurst({ dur: 0.24, gain: 0.018, freq: 1200, q: 0.4, filterType: 'bandpass' });
+  }
+}
+function updateAudio(dt, now){
+  if (!audioState.enabled || !audioState.ctx) return;
+  refreshAmbience(false);
+  maybeTriggerAreaAudio(now, dt);
+}
 
 function ensureQuestFlagDefaults(flags){
   const q = flags || {};
@@ -200,7 +545,7 @@ const stepDefs = {
 };
 
 
-stepDefs.inspect_poster_day3.targetPos = { x: -1.1, z: 3.2 };
+stepDefs.inspect_poster_day3.targetPos = { x: -1.1, z: 2.85 };
 stepDefs.inspect_north.targetPos = { x: -1.8, z: -1.8 };
 stepDefs.inspect_detached.targetPos = { x: 6.8, z: -3.8 };
 stepDefs.inspect_fire_map.targetPos = { x: 5.8, z: -4.3 };
@@ -209,6 +554,8 @@ graph.lobby.archive = 10;
 graph.archive.lobby = 10;
 graph.corridor.north = 18;
 graph.north.corridor = 18;
+graph.lobby.town = 18;
+graph.town.lobby = 18;
 graph.north.detached = 10;
 graph.detached.north = 10;
 graph.archive.detached = 16;
@@ -1460,8 +1807,9 @@ function addItem(id, label, x, z, mesh, onInteract){
   items.push({ id, label, x, z, mesh, onInteract });
 }
 function addDoor(id, label, x, z, radius, toArea, toSpawn, axis, color, opts){
-  doorModel(x, z, axis, label, color, opts || {});
-  doors.push({ id, label, x, z, radius: radius || 1.18, toArea, toSpawn });
+  const doorOpts = opts || {};
+  doorModel(x, z, axis, label, color, doorOpts);
+  doors.push({ id, label, x, z, radius: radius || 1.18, toArea, toSpawn, style: doorOpts.style || 'door' });
 }
 
 function addTree(x, z, scale){
@@ -1791,14 +2139,37 @@ function buildTown(){
   posterBoard.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } });
   areaGroup.add(posterBoard);
   addFloorShadow(-1.08, 2.95, 2.6, 1.1, 0.12);
-  if (state.step === 'inspect_poster_day3') {
-    const trigger = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.14, 1.8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.01 }));
-    trigger.position.y = 0.8;
-    addItem('posterBoard', '掲示板', -1.1, 3.2, trigger, itemInteract);
-  }
+  const trigger = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.8, 2.6), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.01 }));
+  trigger.position.y = 1.0;
+  addItem('posterBoard', '掲示板', -1.1, 2.85, trigger, itemInteract);
 
-  addDoor('townToLobby','旅館入口',9.42,0,2.0,'lobby',{x:0,z:5.85,yaw:0},'x',0xc9b07a);
-  addNPC('villager','町の住民','villager','coat',-4.2,4.2,-0.4,npcInteract);
+  const townEntrance = new THREE.Group();
+  const vestibule = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.55, 1.35), new THREE.MeshStandardMaterial({ color: 0xcdbb9f, roughness: 1 }));
+  vestibule.position.set(9.0, 1.28, 0); townEntrance.add(vestibule);
+  const extFrameL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.28, 0.22), materials.darkWood);
+  const extFrameR = extFrameL.clone();
+  extFrameL.position.set(8.36, 1.14, -0.01); extFrameR.position.set(9.64, 1.14, -0.01); townEntrance.add(extFrameL, extFrameR);
+  const extTop = new THREE.Mesh(new THREE.BoxGeometry(1.44, 0.12, 0.24), materials.darkWood);
+  extTop.position.set(9.0, 2.22, -0.01); townEntrance.add(extTop);
+  const extDoorL = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.98, 0.07), new THREE.MeshStandardMaterial({ color: 0xf0eadc, roughness: 1 }));
+  const extDoorR = extDoorL.clone();
+  extDoorL.position.set(8.7, 1.0, 0.56); extDoorR.position.set(9.3, 1.0, 0.56); townEntrance.add(extDoorL, extDoorR);
+  const extPullL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.24, 0.03), materials.brass);
+  const extPullR = extPullL.clone();
+  extPullL.position.set(8.88, 1.02, 0.62); extPullR.position.set(9.12, 1.02, 0.62); townEntrance.add(extPullL, extPullR);
+  const extLanternL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.42, 0.16), new THREE.MeshStandardMaterial({ color: 0xf5efe0, emissive: 0x7d5b2a, emissiveIntensity: 0.18, roughness: 1 }));
+  const extLanternR = extLanternL.clone();
+  extLanternL.position.set(8.1, 1.65, 0.65); extLanternR.position.set(9.9, 1.65, 0.65); townEntrance.add(extLanternL, extLanternR);
+  const extSign = makeTextPlane('玄関', 0.9, 0.2, { fg:'#f2ead8', bg:'rgba(0,0,0,.35)', fontSize:84 });
+  extSign.position.set(9.0, 2.55, 0.72); townEntrance.add(extSign);
+  townEntrance.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } });
+  areaGroup.add(townEntrance);
+  addFloorShadow(9.0, 0.95, 2.1, 1.15, 0.16);
+
+  addDoor('townToLobby','旅館入口',9.0,0,2.3,'lobby',{x:0,z:5.25,yaw:Math.PI},'x',0xc9b07a);
+  addNPC('villagerA','町の住民','villager','coat',-4.2,4.2,-0.4,npcInteract);
+  addNPC('villagerB','町の住民','villager','casual',2.2,5.4,Math.PI*0.78,npcInteract);
+  addNPC('villagerC','町の住民','villager','tracksuit',-8.2,-4.1,Math.PI*0.18,npcInteract);
 }
 
 
@@ -1824,6 +2195,14 @@ function buildLobby(){
   addFloorShadow(0, 1.25, 7.0, 2.0, 0.10);
   addWallGlow(0, 1.7, -6.66, 6.9, 1.85, 0, 0xffcf97, 0.08);
   const sign = makeLabelPlane('帳場', 1.5, 0.46); sign.position.set(0, 2.56, -6.82); areaGroup.add(sign);
+  const doma = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.18, 2.2), new THREE.MeshStandardMaterial({ color: 0x85796a, roughness: 1 }));
+  doma.position.set(0, 0.02, 5.35); doma.receiveShadow = true; areaGroup.add(doma);
+  const domaStep = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.16, 0.48), materials.darkWood);
+  domaStep.position.set(0, 0.12, 4.15); domaStep.castShadow = domaStep.receiveShadow = true; areaGroup.add(domaStep);
+  const genkanGlow = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.6), new THREE.MeshBasicMaterial({ color: 0xffd8a6, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false }));
+  genkanGlow.position.set(0, 1.2, 6.72); genkanGlow.rotation.y = Math.PI; areaGroup.add(genkanGlow);
+  const genkanSign = makeTextPlane('玄関', 0.95, 0.22, { fg:'#f4ecdf', bg:'rgba(0,0,0,.35)', fontSize:84 });
+  genkanSign.position.set(0, 2.55, 6.74); areaGroup.add(genkanSign);
   const rearShoji = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.18, 0.08), new THREE.MeshStandardMaterial({ color: 0xf1ead9, emissive: 0x7a5b26, emissiveIntensity: 0.09, roughness: 1 }));
   rearShoji.position.set(-1.1, 0.86, -6.76); areaGroup.add(rearShoji);
   for (let i = -5; i <= 5; i++) { const rib = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.28, 0.1), materials.darkWood); rib.position.set(-1.1 + i * 0.42, 0.88, -6.7); areaGroup.add(rib); }
@@ -1869,6 +2248,7 @@ function buildLobby(){
   addFramedPoster(posterAssets.missing, -7.82, 1.65, -0.9, 1.25, 1.75, Math.PI / 2);
   addFramedPoster(posterAssets.wanted, -7.82, 1.55, -3.25, 1.2, 1.65, Math.PI / 2);
 
+  addDoor('lobbyToTown', '外へ出る', 0, 6.84, 1.55, 'town', { x: 7.3, z: 0.0, yaw: -Math.PI/2 }, null, 0xe9dcc1);
   addDoor('lobbyToCorridor', '客室廊下', 7.84, 0, 1.35, 'corridor', { x: -7.15, z: 0, yaw: 0 }, 'x');
   addDoor('lobbyToKitchen', '厨房', -7.84, 3.95, 1.15, 'kitchen', { x: 4.9, z: -1.6, yaw: Math.PI }, 'x');
   addDoor('lobbyToArchive', '宿帳庫', -7.84, -3.95, 1.15, 'archive', { x: 7.8, z: 4.8, yaw: Math.PI * 0.92 }, 'x');
@@ -1933,7 +2313,7 @@ function buildCorridor(){
   const sideRailB = sideRailA.clone(); sideRailB.position.z = 4.22; areaGroup.add(sideRailB);
 
   addDoor('corridorToLobby','帳場',-11.84,0,1.2,'lobby',{x:7.05,z:0,yaw:Math.PI},'x');
-  addDoor('corridorToNorth','北廊下',11.84,0,1.2,'north',{x:-3.75,z:0,yaw:0},'x',0xc3b28a);
+  addDoor('corridorToNorth','北廊下',11.84,0,1.2,'north',{x:-7.35,z:0,yaw:0},'x',0xc3b28a);
   addDoor('corridorTo201','201',0,-4.69,1.25,'room201',{x:0,z:3.88,yaw:Math.PI},null,0xf0e7d1,{style:'fusuma'});
   addDoor('corridorTo202','202',4.8,-4.69,1.25,'room202',{x:0,z:3.88,yaw:Math.PI},null,0xeaddcd,{style:'fusuma'});
   addDoor('corridorToBath','男湯',8.9,4.02,1.3,'bath',{x:-5.25,z:0,yaw:0},null,0xd7ecef,{style:'noren', clothColor:0x2a3f53, subLabel:'MEN'});
@@ -2154,11 +2534,11 @@ function buildBath(){
 function buildArchive(){
   createFloor(18, 14, materials.tile, -0.1);
   createCeiling(18, 14, 0xd6d3cf);
-  scene.fog.color.set(0x0f1116);
-  scene.fog.near = 12;
-  scene.fog.far = 30;
-  hemi.intensity = 0.5;
-  dirLight.intensity = 0.28;
+  scene.fog.color.set(0x131419);
+  scene.fog.near = 14;
+  scene.fog.far = 34;
+  hemi.intensity = 0.56;
+  dirLight.intensity = 0.34;
   wallSegment(0,-6.95,18,3.2,0.14,materials.wallDark); wallSegment(0,6.95,18,3.2,0.14,materials.wallDark); wallSegment(-8.95,0,0.14,3.2,14,materials.wallDark); wallSegment(8.95,0,0.14,3.2,14,materials.wallDark);
   addDoor('archiveToLobby','帳場',8.78,4.8,1.15,'lobby',{x:-6.95,z:-3.55,yaw:0},'x',0xb7b39b);
   addDoor('archiveToDetached','離れ通路',0,-6.55,1.15,'detached',{x:0,z:6.1,yaw:0},null,0x9689a6);
@@ -2202,11 +2582,11 @@ function buildArchive(){
 function buildNorth(){
   createFloor(18, 14, materials.carpet, -0.1);
   createCeiling(18, 14, 0xd4c4ae);
-  scene.fog.color.set(0x121116);
-  scene.fog.near = 12;
-  scene.fog.far = 30;
-  hemi.intensity = 0.5;
-  dirLight.intensity = 0.28;
+  scene.fog.color.set(0x18171a);
+  scene.fog.near = 15;
+  scene.fog.far = 38;
+  hemi.intensity = 0.66;
+  dirLight.intensity = 0.42;
   wallSegment(0,-6.95,18,3.2,0.14,materials.wallDark); wallSegment(0,6.95,18,3.2,0.14,materials.wallDark); wallSegment(-8.95,0,0.14,3.2,14,materials.wallDark); wallSegment(8.95,0,0.14,3.2,14,materials.wallDark);
   // maze-like side partitions
   wallSegment(-3.8,-2.4,0.18,3.2,6.8,materials.darkWood);
@@ -2221,9 +2601,11 @@ function buildNorth(){
   addDoor('northToDetached','離れ通路',7.95,5.2,1.1,'detached',{x:-8.4,z:5.1,yaw:Math.PI/2},'x',0x8f7b64,{style:'fusuma'});
   const hiddenHint = makeTextPlane('離れ', 0.68, 0.16, { fg:'#e9dfc9', bg:'rgba(0,0,0,.22)', fontSize:72 });
   hiddenHint.position.set(7.95,2.2,4.52); hiddenHint.rotation.y = Math.PI / 2; areaGroup.add(hiddenHint);
-  for (const [x,z,scale] of [[-6.8,5.2,0.78],[-2.4,5.0,0.72],[1.6,5.1,0.72],[5.6,5.1,0.76],[-5.8,-5.0,0.74],[-1.2,-5.0,0.7],[2.8,-5.0,0.72],[6.9,-5.0,0.74]]) {
+  for (const [x,z,scale] of [[-7.4,5.2,0.84],[-4.2,5.05,0.78],[-0.6,5.1,0.76],[3.1,5.1,0.8],[6.8,5.05,0.82],[-6.7,-5.0,0.8],[-2.6,-5.0,0.76],[1.8,-5.0,0.78],[5.9,-5.0,0.8]]) {
     addAndonLamp(x,z,scale);
   }
+  addMoodLight(-6.8, 1.7, 0.0, 0xffd9a8, 0.22, 7.8);
+  addMoodLight(2.4, 1.75, -0.8, 0xffd9a8, 0.18, 7.0);
   addBambooPlant(-7.2, 5.35, 0.95); addBambooPlant(1.2, 5.1, 0.88); addIkebana(4.8, -5.1, 0.76);
   addUmbrellaStand(-7.6, -5.1, 0.68, Math.PI/2);
   addFloorShadow(0,0,16.8,2.4,0.1);
@@ -2244,8 +2626,8 @@ function buildNorth(){
 function buildDetached(){
   createFloor(20, 14, materials.wood, -0.1);
   createCeiling(20, 14, 0x1d2235);
-  scene.fog.color.set(0x0c1019); scene.fog.near = 11; scene.fog.far = 30;
-  hemi.intensity = 0.34; dirLight.intensity = 0.18;
+  scene.fog.color.set(0x12151d); scene.fog.near = 13; scene.fog.far = 34;
+  hemi.intensity = 0.42; dirLight.intensity = 0.24;
   wallSegment(0,-6.95,20,3.2,0.14,materials.wallDark); wallSegment(0,6.95,20,3.2,0.14,materials.wallDark); wallSegment(-9.95,0,0.14,3.2,14,materials.wallDark); wallSegment(9.95,0,0.14,3.2,14,materials.wallDark);
   // broken hidden-passage maze
   wallSegment(-6.5,2.0,0.18,3.2,10.2,materials.darkWood);
@@ -2266,7 +2648,8 @@ function buildDetached(){
   addBackdropPlane(realismAssets.forbidden, 7.8, 1.7, -6.7, 4.4, 3.1, 0, 0.45);
   addWallGlow(0,1.4,6.82,18.6,1.9,Math.PI,0x24304a,0.06);
   addWallGlow(0,1.2,-6.82,18.6,1.9,0,0x100d0d,0.18);
-  for (const [x,z] of [[-8.2,4.8],[-4.4,4.9],[-0.3,5.0],[3.6,4.8],[7.8,4.9],[-7.4,-5.0],[-2.2,-4.9],[2.4,-5.0]]) addLamp(x,z,0.22,0x7f98ba);
+  for (const [x,z] of [[-8.2,4.8],[-4.4,4.9],[-0.3,5.0],[3.6,4.8],[7.8,4.9],[-7.4,-5.0],[-2.2,-4.9],[2.4,-5.0]]) addLamp(x,z,0.28,0x9cb2d4);
+  addMoodLight(-1.0, 1.55, 0.0, 0x9eb6d6, 0.12, 6.5);
   addFloorShadow(0,0,18.4,3.4,0.08);
   const debrisMat = new THREE.MeshStandardMaterial({ color: 0x5d4b3e, roughness: 1 });
   for (const [x,z,w,d,r] of [[-5.1,-0.9,1.2,0.22,0.25],[-1.2,1.6,0.8,0.2,-0.35],[4.2,-1.8,1.4,0.18,0.4],[6.4,2.1,0.9,0.18,-0.18]]) {
@@ -2310,36 +2693,45 @@ function npcInteract(entity){
     showDialogue(storyNodes.guest202, () => setStep('collect_lost_item'));
   } else if (entity.id === 'chef' && state.step === 'get_tray') {
     showDialogue(storyNodes.tray, ()=>{});
-  } else if (entity.id === 'villager') {
+  } else if (entity.id && entity.id.startsWith('villager')) {
     showDialogue(storyNodes.villager, ()=>{});
   }
 }
 
 function itemInteract(entity){
   if (entity.id === 'scheduleNote' && state.step === 'start_note') {
+    playSfx('paper');
     showDialogue(storyNodes.home_note, () => setStep('leave_home'));
   } else if (entity.id === 'tray' && state.step === 'get_tray') {
+    playSfx('ui_tap');
     dynamicGroup.remove(entity.mesh);
     removeItem(entity.id);
     state.questFlags.hasTray = true;
     showDialogue(storyNodes.tray, () => setStep('deliver_201'));
   } else if (entity.id === 'amenityBag' && state.step === 'stock_amenities') {
+    playSfx('paper');
     state.questFlags.hasAmenityBag = true;
     showDialogue(storyNodes.amenityBag, () => setStep('place_amenities'));
   } else if (entity.id === 'amenityBox' && state.step === 'place_amenities') {
+    playSfx('ui_tap');
     state.questFlags.placedAmenities = true;
     showDialogue(storyNodes.amenityBox, () => setStep('arrange_slippers'));
   } else if (entity.id === 'slipperRack' && state.step === 'arrange_slippers') {
+    playSfx('step_tile');
     state.questFlags.arrangedSlippers = true;
     showDialogue(storyNodes.slippers, () => setStep('restock_towels'));
   } else if (entity.id === 'towelShelf' && state.step === 'restock_towels') {
+    playSfx('paper');
     state.questFlags.restockedTowels = true;
     showDialogue(storyNodes.towel, () => setStep('answer_phone'));
   } else if (entity.id === 'phone' && state.step === 'answer_phone') {
+    playSfx('phone_pickup');
     showDialogue(storyNodes.phone, () => setStep('inspect_archive'));
   } else if (entity.id === 'oldWingDoorLock') {
+    playSfx('metal_rattle');
     showDialogue([['主人公','重たい鉄扉だ。鍵穴が新しく、今の鍵束では開きそうにない。','hero'], ['主人公','向こうは旧館へ続いている……後で入る方法を探そう。','hero']], ()=>{});
   } else if (entity.id === 'toiletStallDoor') {
+    playSfx('door_open');
     dynamicGroup.remove(entity.mesh);
     removeItem(entity.id);
     state.questFlags.toiletStallOpened = true;
@@ -2347,24 +2739,35 @@ function itemInteract(entity){
     addNPC('toiletGuest','しゃがみ客','guest','crouch',6.15,1.42,0,function(){
       showDialogue([['しゃがみ客','……今は話しかけないでくれ。','guest']], ()=>{});
     });
-    showDialogue([['あなた','ACTで手前の個室を開けた。','hero'], ['しゃがみ客','……っ。誰かいる。', 'guest']], ()=>{});
+    showDialogue([['あなた','ACTで手前の個室を開けた。','hero'], ['しゃがみ客','……っ。誰かいる。', 'guest']], ()=>{
+      window.setTimeout(()=> playSfx('stall_slam'), 900);
+    });
   } else if (entity.id === 'blueLedger' && state.step === 'inspect_archive') {
+    playSfx('note_pickup');
     dynamicGroup.remove(entity.mesh);
     removeItem(entity.id);
     state.questFlags.hasLedger = true;
     showDialogue(storyNodes.blueLedger, () => {
-      startChase('archive', { x: 0, z: 0 }, 'escape_archive');
-      setStep('escape_archive');
+      playSfx('scare_sting');
+      window.setTimeout(() => {
+        startChase('archive', { x: 0, z: 0 }, 'escape_archive');
+        setStep('escape_archive');
+      }, 420);
     });
   } else if (entity.id === 'breakfastTray' && state.step === 'get_breakfast202') {
+    playSfx('ui_tap');
     showDialogue(storyNodes.breakfast202, () => setStep('deliver_202'));
   } else if (entity.id === 'lostKey' && state.step === 'collect_lost_item') {
+    playSfx('metal_rattle');
     showDialogue(storyNodes.lostKey, () => setStep('inspect_register'));
   } else if (entity.id === 'registerBook' && state.step === 'inspect_register') {
+    playSfx('paper');
     showDialogue(storyNodes.registerCheck, () => setStep('inspect_north'));
   } else if (entity.id === 'sealTag' && state.step === 'inspect_north') {
+    playSfx('paper');
     showDialogue(storyNodes.sealTag, () => setStep('inspect_detached'));
   } else if (entity.id === 'futonBed' && state.step === 'sleep_day1') {
+    playSfx('sleep');
     showDialogue(storyNodes.sleep_day1, () => {
       state.area = 'home';
       buildArea(state.area);
@@ -2373,6 +2776,7 @@ function itemInteract(entity){
       setStep('leave_home_day2');
     });
   } else if (entity.id === 'futonBed' && state.step === 'sleep_day2') {
+    playSfx('sleep');
     showDialogue(storyNodes.sleep_day2, () => {
       state.area = 'home';
       buildArea(state.area);
@@ -2381,18 +2785,26 @@ function itemInteract(entity){
       setStep('leave_home_day3');
     });
   } else if (entity.id === 'posterBoard' && state.step === 'inspect_poster_day3') {
+    playSfx('paper');
     state.questFlags.sawMissingPosterShift = true;
     showDialogue(storyNodes.posterShift, () => setStep('commute_day3'));
+  } else if (entity.id === 'posterBoard') {
+    playSfx('paper');
+    showDialogue([['主人公','町の掲示板だ。古い行方不明者の貼り紙が何枚も重なっている。','hero']], ()=>{});
   } else if (entity.id === 'bathNotice' && state.step === 'inspect_bath_notice') {
+    playSfx('paper');
     state.questFlags.checkedBathNoticeDay3 = true;
     showDialogue(storyNodes.bathNotice, () => setStep('inspect_fire_map'));
   } else if (entity.id === 'fireMap' && state.step === 'inspect_fire_map') {
+    playSfx('paper');
     state.questFlags.checkedFireMap = true;
     showDialogue(storyNodes.fireMap, () => setStep('read_blue_note_2'));
   } else if (entity.id === 'blueLedger2' && state.step === 'read_blue_note_2') {
+    playSfx('paper');
     state.questFlags.readBlueNote2 = true;
     showDialogue(storyNodes.blueLedger2, () => setStep('guide_tease_day3'));
   } else if (entity.id === 'phantom203' && state.step === 'enter_203_phantom') {
+    playSfx('scare_sting');
     state.questFlags.entered203Phantom = true;
     showDialogue(storyNodes.phantom203, () => setStep('final_choice'));
   } else if (entity.id === 'endingBurn' && state.step === 'choose_fate') {
@@ -2411,6 +2823,7 @@ function itemInteract(entity){
       finishEnding('replace');
     });
   } else if (entity.id === 'altar' && state.step === 'inspect_detached') {
+    playSfx('metal_rattle');
     showDialogue(storyNodes.altar, () => {
       startChase('detached', { x: 0, z: 0 }, 'escape_detached');
       setStep('escape_detached');
@@ -2424,6 +2837,7 @@ function removeItem(id){
 }
 
 function showDialogue(list, done){
+  unlockAudio();
   state.menuOpen = true;
   state.dialogueQueue = list.map(row => ({ name: row[0], text: row[1], face: row[2] }));
   dialogueOverlay.classList.remove('hidden');
@@ -2441,6 +2855,7 @@ function advanceDialogue(){
     return;
   }
   const row = state.dialogueQueue.shift();
+  playSfx('dialogue_tick');
   dialogueNameEl.textContent = row.name;
   dialogueTextEl.textContent = row.text;
   portraitEl.innerHTML = '';
@@ -2481,6 +2896,7 @@ function applyEndingScreen(type){
   }
 }
 function finishEnding(type){
+  playSfx('ending');
   state.questFlags.endingType = type;
   state.ended = true;
   applyEndingScreen(type);
@@ -2509,11 +2925,14 @@ function getChaseCheckpoint(areaId, linkedStep){
 }
 
 function startChase(areaId, guidePos, linkedStep){
+  playSfx('chase_start');
   const cp = getChaseCheckpoint(areaId, linkedStep);
   state.checkpoint = { area: cp.area, x: cp.x, z: cp.z, yaw: cp.yaw, step: linkedStep, guideSpawn: cp.guideSpawn };
   player.x = cp.x;
   player.z = cp.z;
   player.yaw = cp.yaw;
+  audioState.prevX = player.x;
+  audioState.prevZ = player.z;
   player.pitch = 0;
   state.inputLockUntil = performance.now() + 900;
   state.doorCooldownUntil = performance.now() + 1200;
@@ -2524,6 +2943,7 @@ function startChase(areaId, guidePos, linkedStep){
 function stopChase(){
   state.chase = null;
   if (state.guide) { dynamicGroup.remove(state.guide.group); state.guide = null; }
+  refreshAmbience(true);
 }
 function openReturnHome(){
   state.menuOpen = true;
@@ -2531,11 +2951,14 @@ function openReturnHome(){
   returnHomeEl.classList.remove('hidden');
 }
 function goHomeNow(){
+  playSfx('door_open');
   returnHomeEl.classList.add('hidden');
   state.menuOpen = false;
   state.area = 'home';
   buildArea(state.area);
   player.x = 0.6; player.z = 2.6; player.yaw = 0; player.pitch = -0.05;
+  audioState.prevX = player.x;
+  audioState.prevZ = player.z;
   resetInput();
   state.inputLockUntil = performance.now() + 500;
   state.doorCooldownUntil = performance.now() + 900;
@@ -2550,6 +2973,7 @@ function spawnGuide(x,z){
   updateCharacterBillboard(state.guide);
 }
 function triggerGameOver(){
+  playSfx('game_over');
   state.menuOpen = true;
   resetInput();
   gameOverEl.classList.remove('hidden');
@@ -2568,6 +2992,8 @@ function retryFromCheckpoint(){
   player.x = state.checkpoint.x;
   player.z = state.checkpoint.z;
   player.yaw = state.checkpoint.yaw;
+  audioState.prevX = player.x;
+  audioState.prevZ = player.z;
   player.pitch = 0;
   resetInput();
   state.inputLockUntil = performance.now() + 1000;
@@ -2586,10 +3012,12 @@ function retryFromCheckpoint(){
 }
 
 function interact(){
+  unlockAudio();
   if (state.menuOpen) return;
   if (!dialogueOverlay.classList.contains('hidden')) return;
   const target = getNearestInteractable();
   if (!target) return;
+  playSfx('ui_tap');
   if (target.type === 'door') {
     useDoor(target.entity);
   } else if (target.type === 'npc') {
@@ -2614,7 +3042,7 @@ function getNearestInteractable(){
     const dist = Math.hypot(dx, dz);
     const isCurrentTarget = !!(trigger && trigger.type === obj.type && trigger.id === obj.entity.id);
     const id = obj.entity && obj.entity.id;
-    const largePromptIds = new Set(['posterBoard','futonBed','scheduleNote','amenityBag','amenityBox','slipperRack','towelShelf','phone','registerBook','sealTag','altar','bathNotice','fireMap','blueLedger','blueLedger2','toiletStallDoor','phantom203']);
+    const largePromptIds = new Set(['posterBoard','futonBed','scheduleNote','amenityBag','amenityBox','slipperRack','towelShelf','phone','registerBook','sealTag','altar','bathNotice','fireMap','blueLedger','blueLedger2','toiletStallDoor','phantom203','oldWingDoorLock']);
     const bonusDist = largePromptIds.has(id) ? 1.8 : 0;
     const maxDist = obj.type === 'door' ? 3.1 : (isCurrentTarget ? 6.0 + bonusDist : 2.8 + bonusDist * 0.4);
     if (dist > maxDist) continue;
@@ -2647,11 +3075,15 @@ function useDoor(door){
     gameOverEl.classList.add('hidden');
   }
   returnHomeEl.classList.add('hidden');
+  const doorSfx = door.style === 'fusuma' ? 'door_slide' : (door.style === 'noren' ? 'door_noren' : 'door_open');
+  playSfx(doorSfx);
   state.area = door.toArea;
   buildArea(state.area);
   player.x = door.toSpawn.x;
   player.z = door.toSpawn.z;
   player.yaw = door.toSpawn.yaw || 0;
+  audioState.prevX = player.x;
+  audioState.prevZ = player.z;
   player.pitch = 0;
   if (chaseSucceeded) {
     if (state.step === 'escape_archive') {
@@ -2833,6 +3265,7 @@ function animate(now){
   movePlayer(dt);
   updateChase(dt);
   updateCutscene(dt);
+  updateAudio(dt, now);
   setCamera();
   update();
   renderer.render(scene, camera);
@@ -2918,6 +3351,9 @@ function loadFromSlot(slot, silent){
       applyEndingScreen(state.questFlags.endingType || '');
       endingEl.classList.remove('hidden');
     }
+    audioState.prevX = player.x;
+    audioState.prevZ = player.z;
+    refreshAmbience(true);
     setStep(state.step);
     if (!silent) window.alert('SLOT ' + slot + ' を読み込みました');
     return true;
@@ -2967,6 +3403,11 @@ function resetInput(){
 }
 
 function setupControls(){
+  updateSoundButton();
+  const tryUnlockAudio = () => unlockAudio();
+  document.addEventListener('pointerdown', tryUnlockAudio, { passive:true });
+  document.addEventListener('touchstart', tryUnlockAudio, { passive:true });
+  document.addEventListener('keydown', tryUnlockAudio);
   window.addEventListener('resize', onResize);
   document.addEventListener('keydown', function(e){
     if (e.code === 'KeyE') { interact(); e.preventDefault(); return; }
@@ -2985,6 +3426,7 @@ function setupControls(){
     else if (act === 'save') { toggleMenu(false); openSlotOverlay('save'); }
     else if (act === 'load') { toggleMenu(false); openSlotOverlay('load'); }
     else if (act === 'hud') { state.hudHidden = !state.hudHidden; toggleMenu(false); saveToSlot(1, true); }
+    else if (act === 'sound') { setAudioMuted(!audioState.muted); }
     else if (act === 'title') { stopChase(); gameOverEl.classList.add('hidden'); location.href = 'index.html'; }
   });
   gameOverEl.addEventListener('click', function(e){
@@ -3159,7 +3601,10 @@ function beginNewGame(){
   stopChase();
   buildArea('home');
   player.x = 0.6; player.z = 2.6; player.yaw = 0; player.pitch = -0.05;
+  audioState.prevX = player.x;
+  audioState.prevZ = player.z;
   resetInput();
+  refreshAmbience(true);
   setStep('start_note');
 }
 
