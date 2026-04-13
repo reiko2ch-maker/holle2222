@@ -62,3 +62,5 @@
 - Fixed Day 3 register ACT prompt with front-side interaction proxy.
 - Improved second chase unstuck logic and safer guide spawn points.
 - Updated guide portrait asset binding.
+
+- B28: chase spawn safety, guide always-front texture, okami cutscene path fix.

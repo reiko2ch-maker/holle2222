@@ -874,7 +874,8 @@ const characterAssets = {
   guide: {
     front: loadAssetTexture('assets/characters/guide_scary_front.png'),
     side: loadAssetTexture('assets/characters/guide_scary_side.png'),
-    portrait: loadAssetTexture('assets/characters/guide_portrait.png')
+    portrait: loadAssetTexture('assets/characters/guide_portrait.png'),
+    alwaysFront: true
   },
   suit: {
     front: loadAssetTexture('assets/characters/suit_front.png'),
@@ -976,7 +977,7 @@ function updateCharacterBillboard(entity){
   const facing = entity.rot ?? entity.yaw ?? entity.group.rotation.y ?? 0;
   const delta = normalizeAngle(toCamera - facing);
   const absDelta = Math.abs(delta);
-  const useSide = absDelta > Math.PI * 0.25 && absDelta < Math.PI * 0.75 && !!profile.side;
+  const useSide = !profile.alwaysFront && absDelta > Math.PI * 0.25 && absDelta < Math.PI * 0.75 && !!profile.side;
   plane.material.map = useSide ? profile.side : profile.front;
   plane.material.needsUpdate = true;
   const flip = delta >= 0 ? 1 : -1;
@@ -1054,8 +1055,8 @@ function maybeStartLobbyArrivalCutscene(entryDoorId){
   if (!(state.step === 'talk_okami' || state.step === 'walk_to_ryokan')) return;
   const okami = npcs.find(n => n.id === 'okami');
   if (!okami) return;
-  const sx = -6.95, sz = 3.55;
-  const mx = -4.7, mz = 1.65;
+  const sx = -5.15, sz = 2.35;
+  const mx = -2.45, mz = 0.35;
   const ex = 0.0, ez = -3.05;
   okami.group.position.set(sx, 0, sz);
   okami.x = sx; okami.z = sz; okami.rot = 0.0;
@@ -2295,7 +2296,7 @@ function buildLobby(){
   addDoor('lobbyToCorridor', '客室廊下', 7.84, 0, 1.35, 'corridor', { x: -7.15, z: 0, yaw: 0 }, 'x');
   addDoor('lobbyToKitchen', '厨房', -7.84, 3.95, 1.15, 'kitchen', { x: 4.9, z: -1.6, yaw: Math.PI }, 'x');
   addDoor('lobbyToArchive', '宿帳庫', -7.84, -3.95, 1.15, 'archive', { x: 7.8, z: 4.8, yaw: Math.PI * 0.92 }, 'x');
-  if (!state.questFlags.okamiArrivalSceneDone && (state.step === 'walk_to_ryokan' || state.step === 'talk_okami')) addNPC('okami', '女将', 'okami', 'suit', -6.95, 3.55, 0.0, npcInteract);
+  if (!state.questFlags.okamiArrivalSceneDone && (state.step === 'walk_to_ryokan' || state.step === 'talk_okami')) addNPC('okami', '女将', 'okami', 'suit', -5.15, 2.35, 0.0, npcInteract);
   else addNPC('okami', '女将', 'okami', 'suit', 0, -3.0, Math.PI, npcInteract);
 }
 
@@ -2969,10 +2970,10 @@ function setStep(id){
 
 function getChaseCheckpoint(areaId, linkedStep){
   if (areaId === 'archive') {
-    return { area: 'archive', x: -0.9, z: 2.2, yaw: Math.PI * 0.1, step: linkedStep, guideSpawn: { x: -6.6, z: -2.2 } };
+    return { area: 'archive', x: 5.9, z: 2.05, yaw: -Math.PI * 0.18, step: linkedStep, guideSpawn: { x: -6.4, z: -2.1 } };
   }
   if (areaId === 'detached') {
-    return { area: 'detached', x: 1.9, z: -0.8, yaw: Math.PI * 0.2, step: linkedStep, guideSpawn: { x: 7.8, z: 0.8 } };
+    return { area: 'detached', x: 2.4, z: -1.2, yaw: Math.PI * 0.18, step: linkedStep, guideSpawn: { x: 7.2, z: 1.2 } };
   }
   return { area: areaId, x: player.x, z: player.z, yaw: player.yaw, step: linkedStep, guideSpawn: { x: 0, z: 0 } };
 }
@@ -2980,9 +2981,12 @@ function getChaseCheckpoint(areaId, linkedStep){
 function startChase(areaId, guidePos, linkedStep){
   playSfx('chase_start');
   const cp = getChaseCheckpoint(areaId, linkedStep);
-  state.checkpoint = { area: cp.area, x: cp.x, z: cp.z, yaw: cp.yaw, step: linkedStep, guideSpawn: cp.guideSpawn };
-  player.x = cp.x;
-  player.z = cp.z;
+  const safePlayer = findNearestOpenPoint(cp.x, cp.z, player.radius || 0.32);
+  const wantedGuide = guidePos && (typeof guidePos.x === 'number' || typeof guidePos.z === 'number') ? { x: guidePos.x ?? cp.guideSpawn.x, z: guidePos.z ?? cp.guideSpawn.z } : cp.guideSpawn;
+  const safeGuide = findNearestOpenPoint(wantedGuide.x, wantedGuide.z, 0.3, safePlayer.x, safePlayer.z);
+  state.checkpoint = { area: cp.area, x: safePlayer.x, z: safePlayer.z, yaw: cp.yaw, step: linkedStep, guideSpawn: safeGuide };
+  player.x = safePlayer.x;
+  player.z = safePlayer.z;
   player.yaw = cp.yaw;
   audioState.prevX = player.x;
   audioState.prevZ = player.z;
@@ -2991,7 +2995,7 @@ function startChase(areaId, guidePos, linkedStep){
   state.doorCooldownUntil = performance.now() + 1200;
   resetInput();
   state.chase = { active: true, speed: 2.35, graceUntil: performance.now() + 2200 };
-  spawnGuide(cp.guideSpawn.x, cp.guideSpawn.z);
+  spawnGuide(safeGuide.x, safeGuide.z);
   refreshAmbience(true);
 }
 function stopChase(){
@@ -3096,8 +3100,9 @@ function retryFromCheckpoint(){
   stopChase();
   state.area = state.checkpoint.area;
   buildArea(state.area);
-  player.x = state.checkpoint.x;
-  player.z = state.checkpoint.z;
+  const safeRetry = findNearestOpenPoint(state.checkpoint.x, state.checkpoint.z, player.radius || 0.32);
+  player.x = safeRetry.x;
+  player.z = safeRetry.z;
   player.yaw = state.checkpoint.yaw;
   audioState.prevX = player.x;
   audioState.prevZ = player.z;
@@ -3109,12 +3114,14 @@ function retryFromCheckpoint(){
   if (state.step === 'escape_archive') {
     state.chase = { active: true, speed: 2.35, graceUntil: performance.now() + 2200 };
     const gs = state.checkpoint.guideSpawn || {x:-4.95,z:-2.2};
-    spawnGuide(gs.x, gs.z);
+    const safeGs = findNearestOpenPoint(gs.x, gs.z, 0.3, player.x, player.z);
+    spawnGuide(safeGs.x, safeGs.z);
   }
   if (state.step === 'escape_detached') {
     state.chase = { active: true, speed: 2.35, graceUntil: performance.now() + 2200 };
     const gs = state.checkpoint.guideSpawn || {x:5.3,z:-2.6};
-    spawnGuide(gs.x, gs.z);
+    const safeGs = findNearestOpenPoint(gs.x, gs.z, 0.3, player.x, player.z);
+    spawnGuide(safeGs.x, safeGs.z);
   }
 }
 
@@ -3288,6 +3295,11 @@ function setCamera(){
 
 function movePlayer(dt){
   if (state.menuOpen || !dialogueOverlay.classList.contains('hidden')) return;
+  if (collidesAt(player.x, player.z, player.radius)) {
+    const safe = findNearestOpenPoint(player.x, player.z, player.radius || 0.32);
+    player.x = safe.x;
+    player.z = safe.z;
+  }
   const moveX = input.joyX + ((input.keys.KeyD?1:0) - (input.keys.KeyA?1:0));
   const moveY = input.joyY + ((input.keys.KeyW?1:0) - (input.keys.KeyS?1:0));
   const len = Math.hypot(moveX, moveY);
