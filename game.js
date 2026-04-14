@@ -465,6 +465,8 @@ function ensureQuestFlagDefaults(flags){
   q.sawMissingPosterShift ??= false;
   q.heardAbout203 ??= false;
   q.talkedToToiletGuestDay3 ??= false;
+  q.hasToiletPaper ??= false;
+  q.hasOldWingKey ??= false;
   q.checkedBathNoticeDay3 ??= false;
   q.checkedFireMap ??= false;
   q.readBlueNote2 ??= false;
@@ -692,6 +694,23 @@ const storyNodes = {
     ['主人公', `宿帳の端に、203号室の欄がある。
 この旅館にないはずの部屋番だ。`, 'hero'],
     ['主人公', `しかも、備考欄の癖のある払いは、自分の字に少し似ている。`, 'hero']
+  ],
+  toiletGuestNeedPaper: [
+    ['しゃがみ客', `……悪い。紙が切れてる。`, 'guest'],
+    ['しゃがみ客', `名前の話なら、その後だ。まずトイレットペーパーをくれ。`, 'guest'],
+    ['主人公', `こんな状況で、そこだけ妙に現実的だな……。`, 'hero']
+  ],
+  foundToiletPaper: [
+    ['主人公', `替え棚の端に、使いかけじゃない紙が一本だけ残っていた。`, 'hero'],
+    ['主人公', `これを持っていけば、話してくれるかもしれない。`, 'hero']
+  ],
+  toiletGuestReward: [
+    ['主人公', `トイレットペーパーを差し出す。`, 'hero'],
+    ['しゃがみ客', `……助かった。礼に、これをやる。`, 'guest'],
+    ['しゃがみ客', `さっき足元に落ちてた。番台の裏の鉄扉に合う鍵だ。`, 'guest'],
+    ['しゃがみ客', `名前を書くな。203は部屋じゃない。
+空いた席に、客の形を流し込むための番号だ。`, 'guest'],
+    ['主人公', `錆びた古い鍵を受け取った。`, 'hero']
   ],
   toiletGuestDay3: [
     ['しゃがみ客', `……昨日より近い顔になったな。`, 'guest'],
@@ -1055,8 +1074,8 @@ function maybeStartLobbyArrivalCutscene(entryDoorId){
   if (!(state.step === 'talk_okami' || state.step === 'walk_to_ryokan')) return;
   const okami = npcs.find(n => n.id === 'okami');
   if (!okami) return;
-  const sx = -5.15, sz = 2.35;
-  const mx = -2.45, mz = 0.35;
+  const sx = -3.55, sz = 1.95;
+  const mx = -1.85, mz = 0.7;
   const ex = 0.0, ez = -3.05;
   okami.group.position.set(sx, 0, sz);
   okami.x = sx; okami.z = sz; okami.rot = 0.0;
@@ -2296,7 +2315,7 @@ function buildLobby(){
   addDoor('lobbyToCorridor', '客室廊下', 7.84, 0, 1.35, 'corridor', { x: -7.15, z: 0, yaw: 0 }, 'x');
   addDoor('lobbyToKitchen', '厨房', -7.84, 3.95, 1.15, 'kitchen', { x: 4.9, z: -1.6, yaw: Math.PI }, 'x');
   addDoor('lobbyToArchive', '宿帳庫', -7.84, -3.95, 1.15, 'archive', { x: 7.8, z: 4.8, yaw: Math.PI * 0.92 }, 'x');
-  if (!state.questFlags.okamiArrivalSceneDone && (state.step === 'walk_to_ryokan' || state.step === 'talk_okami')) addNPC('okami', '女将', 'okami', 'suit', -5.15, 2.35, 0.0, npcInteract);
+  if (!state.questFlags.okamiArrivalSceneDone && (state.step === 'walk_to_ryokan' || state.step === 'talk_okami')) addNPC('okami', '女将', 'okami', 'suit', -3.55, 1.95, 0.0, npcInteract);
   else addNPC('okami', '女将', 'okami', 'suit', 0, -3.0, Math.PI, npcInteract);
 }
 
@@ -2515,6 +2534,15 @@ function buildBath(){
   for (const sy of [0.48,0.94]) { const plank = new THREE.Mesh(new THREE.BoxGeometry(1.44,0.05,0.5), materials.wood); plank.position.set(4.9,sy,2.45); areaGroup.add(plank); }
   for (const [tx,ty,tz] of [[4.5,1.15,2.47],[4.9,1.15,2.47],[5.3,1.15,2.47],[4.6,0.69,2.47],[5.0,0.69,2.47],[5.4,0.69,2.47]]) { const towel = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.24), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })); towel.position.set(tx,ty,tz); areaGroup.add(towel); }
   if (state.step === 'restock_towels') addItem('towelShelf','替えタオル棚',5.05,2.62, new THREE.Mesh(new THREE.BoxGeometry(0.54,0.22,0.26), new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 1 })), itemInteract);
+  if (state.step === 'get_toilet_paper_day3' && !state.questFlags.hasToiletPaper) {
+    const roll = new THREE.Group();
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.16,14), new THREE.MeshStandardMaterial({ color: 0xc7a56e, roughness: 1 }));
+    core.rotation.z = Math.PI * 0.5; roll.add(core);
+    const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.18,18), new THREE.MeshStandardMaterial({ color: 0xf5f3ee, roughness: 1 }));
+    paper.rotation.z = Math.PI * 0.5; roll.add(paper);
+    roll.position.y = 0.82;
+    addItem('toiletPaperRoll','トイレットペーパー',4.75,2.2, roll, itemInteract);
+  }
 
   addLamp(-4.7,0.2,0.62,0xffe6bc); addLamp(-1.0,0.2,0.62,0xffe6bc); addLamp(3.1,0.2,0.58,0xffe6bc);
   addMoodLight(0.9, 1.3, 2.1, 0xffcf96, 0.16, 4.2);
@@ -2566,7 +2594,11 @@ function buildBath(){
     addNPC('toiletGuest','しゃがみ客','guest','crouch',6.15,1.42,0,function(){
       if (state.step === 'talk_toilet_guest_day3') {
         state.questFlags.talkedToToiletGuestDay3 = true;
-        showDialogue(storyNodes.toiletGuestDay3, ()=> setStep('inspect_bath_notice'));
+        showDialogue(storyNodes.toiletGuestNeedPaper, ()=> setStep('get_toilet_paper_day3'));
+      } else if (state.step === 'give_toilet_paper_day3' && state.questFlags.hasToiletPaper) {
+        state.questFlags.hasToiletPaper = false;
+        state.questFlags.hasOldWingKey = true;
+        showDialogue(storyNodes.toiletGuestReward, ()=> setStep('inspect_bath_notice'));
       } else {
         showDialogue([['しゃがみ客','……今は話しかけないでくれ。','guest']], ()=>{});
       }
@@ -2783,7 +2815,11 @@ function itemInteract(entity){
     showDialogue(storyNodes.phone, () => setStep('inspect_archive'));
   } else if (entity.id === 'oldWingDoorLock') {
     playSfx('metal_rattle');
-    showDialogue([['主人公','重たい鉄扉だ。鍵穴が新しく、今の鍵束では開きそうにない。','hero'], ['主人公','向こうは旧館へ続いている……後で入る方法を探そう。','hero']], ()=>{});
+    if (state.questFlags.hasOldWingKey) {
+      showDialogue([['主人公','錆びた鍵が手の中で冷たい。番台裏の鉄扉に、たしかに合いそうだ。','hero'], ['主人公','……けど、今はまだ開ける時じゃない。宿の記録を先に追う。','hero']], ()=>{});
+    } else {
+      showDialogue([['主人公','重たい鉄扉だ。鍵穴が新しく、今の鍵束では開きそうにない。','hero'], ['主人公','向こうは旧館へ続いている……後で入る方法を探そう。','hero']], ()=>{});
+    }
   } else if (entity.id === 'toiletStallDoor') {
     playSfx('door_open');
     dynamicGroup.remove(entity.mesh);
@@ -2817,6 +2853,9 @@ function itemInteract(entity){
   } else if (entity.id === 'registerBook' && state.step === 'inspect_register') {
     playSfx('paper');
     showDialogue(storyNodes.registerCheck, () => setStep('inspect_north'));
+  } else if (entity.id === 'registerBook' && state.step === 'inspect_guestbook_203') {
+    playSfx('paper');
+    showDialogue(storyNodes.register203, () => setStep('talk_toilet_guest_day3'));
   } else if (entity.id === 'sealTag' && state.step === 'inspect_north') {
     playSfx('paper');
     showDialogue(storyNodes.sealTag, () => setStep('inspect_detached'));
@@ -2845,6 +2884,12 @@ function itemInteract(entity){
   } else if (entity.id === 'posterBoard') {
     playSfx('paper');
     showDialogue([['主人公','町の掲示板だ。古い行方不明者の貼り紙が何枚も重なっている。','hero']], ()=>{});
+  } else if (entity.id === 'toiletPaperRoll' && state.step === 'get_toilet_paper_day3') {
+    playSfx('paper');
+    dynamicGroup.remove(entity.mesh);
+    removeItem(entity.id);
+    state.questFlags.hasToiletPaper = true;
+    showDialogue(storyNodes.foundToiletPaper, () => setStep('give_toilet_paper_day3'));
   } else if (entity.id === 'bathNotice' && state.step === 'inspect_bath_notice') {
     playSfx('paper');
     state.questFlags.checkedBathNoticeDay3 = true;
@@ -2970,7 +3015,7 @@ function setStep(id){
 
 function getChaseCheckpoint(areaId, linkedStep){
   if (areaId === 'archive') {
-    return { area: 'archive', x: 5.9, z: 2.05, yaw: -Math.PI * 0.18, step: linkedStep, guideSpawn: { x: -6.4, z: -2.1 } };
+    return { area: 'archive', x: 6.9, z: 4.0, yaw: -Math.PI * 0.18, step: linkedStep, guideSpawn: { x: -5.9, z: -2.2 } };
   }
   if (areaId === 'detached') {
     return { area: 'detached', x: 2.4, z: -1.2, yaw: Math.PI * 0.18, step: linkedStep, guideSpawn: { x: 7.2, z: 1.2 } };
@@ -3080,7 +3125,7 @@ function spawnGuide(x,z){
   const group = makeCharacter('guide', 0x2f4d7d);
   group.position.set(x,0,z);
   dynamicGroup.add(group);
-  state.guide = { group, x, z, yaw: 0, stuckFor: 0, steerSign: Math.random() < 0.5 ? -1 : 1 };
+  state.guide = { group, x, z, yaw: 0, rot: Math.PI, stuckFor: 0, steerSign: Math.random() < 0.5 ? -1 : 1 };
   updateCharacterBillboard(state.guide);
 }
 function triggerGameOver(){
@@ -3129,6 +3174,14 @@ function interact(){
   unlockAudio();
   if (state.menuOpen) return;
   if (!dialogueOverlay.classList.contains('hidden')) return;
+  if (state.area === 'lobby' && (state.step === 'inspect_register' || state.step === 'inspect_guestbook_203')) {
+    const inRegisterZone = Math.abs(player.x - 1.1) < 1.9 && player.z < -1.6 && player.z > -4.8;
+    if (inRegisterZone) {
+      playSfx('ui_tap');
+      itemInteract({ id: 'registerBook' });
+      return;
+    }
+  }
   const target = getNearestInteractable();
   if (!target) return;
   playSfx('ui_tap');
@@ -3388,6 +3441,7 @@ function updateChase(dt){
   }
 
   state.guide.group.rotation.y = Math.atan2(dx, dz);
+  state.guide.rot = state.guide.group.rotation.y + Math.PI;
 }
 
 function updateDoorLatch(){
