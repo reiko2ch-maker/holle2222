@@ -534,6 +534,8 @@ const stepDefs = {
   talk_okami_day3: { day: 3, phase: '昼勤務', text: '帳場で女将の指示を聞く', sub: '帳場へ', targetArea: 'lobby', targetPos: { x: 0, z: -2.8 }, trigger: { type: 'npc', id: 'okami' } },
   inspect_guestbook_203: { day: 3, phase: '昼勤務', text: '帳場で203号室の記録を確かめる', sub: '宿帳へ', targetArea: 'lobby', targetPos: { x: 1.1, z: -2.95 }, trigger: { type: 'item', id: 'registerBook' } },
   talk_toilet_guest_day3: { day: 3, phase: '夕方', text: '浴場の個室の客にもう一度話しかける', sub: '浴場前へ', targetArea: 'bath', targetPos: { x: 6.15, z: 1.42 }, trigger: { type: 'npc', id: 'toiletGuest' } },
+  get_toilet_paper_day3: { day: 3, phase: '夕方', text: '浴場の棚からトイレットペーパーを持ってくる', sub: '紙棚へ', targetArea: 'bath', targetPos: { x: 4.75, z: 2.2 }, trigger: { type: 'item', id: 'toiletPaperRoll' } },
+  give_toilet_paper_day3: { day: 3, phase: '夕方', text: '個室の客へトイレットペーパーを渡す', sub: 'しゃがみ客へ', targetArea: 'bath', targetPos: { x: 6.15, z: 1.42 }, trigger: { type: 'npc', id: 'toiletGuest' } },
   inspect_bath_notice: { day: 3, phase: '夕方', text: '女湯前の清掃案内を調べる', sub: '女湯前へ', targetArea: 'bath', targetPos: { x: -3.45, z: 2.85 }, trigger: { type: 'item', id: 'bathNotice' } },
   inspect_fire_map: { day: 3, phase: '夜', text: '北廊下で古い避難図を探す', sub: '北廊下へ', targetArea: 'north', targetPos: { x: 1.9, z: -1.2 }, trigger: { type: 'item', id: 'fireMap' } },
   read_blue_note_2: { day: 3, phase: '夜', text: '宿帳庫で青いノートの続きを読む', sub: '宿帳庫へ', targetArea: 'archive', targetPos: { x: -1.6, z: -2.1 }, trigger: { type: 'item', id: 'blueLedger2' } },
@@ -3003,7 +3005,7 @@ function finishEnding(type){
   saveToSlot(1, true);
 }
 
-function currentStep(){ return stepDefs[state.step]; }
+function currentStep(){ return stepDefs[state.step] || stepDefs.start_note; }
 function setStep(id){
   state.step = id;
   const def = currentStep();

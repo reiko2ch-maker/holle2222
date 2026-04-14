@@ -1,3 +1,7 @@
+# Changelog
+
+- B30: DAY3しゃがみ客イベントの進行定義不足によるフリーズを修正。トイレットペーパー取得/受け渡しステップを追加し、未定義ステップでも進行UIが落ちないよう安全化。
+
 # CHANGELOG
 
 ## B29 Day3 Fix + Toilet Key Event
