@@ -930,6 +930,22 @@ const characterAssets = {
     squat: 0.58
   }
 };
+const fallbackLabels = {
+  registerBook: '宿帳',
+  posterBoard: '掲示板',
+  futonBed: '布団',
+  scheduleNote: '手紙',
+  toiletGuest: 'しゃがみ客',
+  towelShelf: 'タオル棚',
+  toiletPaperRoll: 'トイレットペーパー',
+  bathNotice: '清掃案内',
+  fireMap: '避難図',
+  blueLedger: '青い宿帳',
+  blueLedger2: '青いノート',
+  phantom203: '203の痕跡',
+  oldWingDoorLock: '鉄扉'
+};
+
 const portraitPaths = {
   hero: 'assets/characters/portrait_smile.png',
   okami: 'assets/characters/portrait_smile.png',
@@ -2779,6 +2795,18 @@ function npcInteract(entity){
     showDialogue(storyNodes.maid, () => setStep('get_breakfast202'));
   } else if (entity.id === 'guest202' && state.step === 'deliver_202') {
     showDialogue(storyNodes.guest202, () => setStep('collect_lost_item'));
+  } else if (entity.id === 'toiletGuest') {
+    if (state.step === 'talk_toilet_guest_day3') {
+      showDialogue(storyNodes.toiletGuestNeedPaper, () => setStep('get_toilet_paper_day3'));
+    } else if (state.step === 'give_toilet_paper_day3' && state.questFlags.hasToiletPaper) {
+      state.questFlags.hasToiletPaper = false;
+      state.questFlags.hasOldWingKey = true;
+      showDialogue(storyNodes.toiletGuestReward, () => setStep('inspect_bath_notice'));
+    } else if (state.step === 'give_toilet_paper_day3') {
+      showDialogue([['しゃがみ客','……紙を先に持ってきてくれ。','guest']], ()=>{});
+    } else {
+      showDialogue(storyNodes.toiletGuestDay3, ()=>{});
+    }
   } else if (entity.id === 'chef' && state.step === 'get_tray') {
     showDialogue(storyNodes.tray, ()=>{});
   } else if (entity.id && entity.id.startsWith('villager')) {
@@ -3172,10 +3200,56 @@ function retryFromCheckpoint(){
   }
 }
 
+function getLiveEntityForTrigger(trigger){
+  if (!trigger) return null;
+  const pool = trigger.type === 'door' ? doors : (trigger.type === 'npc' ? npcs : items);
+  return pool.find(v => v.id === trigger.id) || null;
+}
+
+function dispatchTrigger(trigger){
+  if (!trigger) return false;
+  const live = getLiveEntityForTrigger(trigger);
+  if (trigger.type === 'door') {
+    if (live) { useDoor(live); return true; }
+    return false;
+  }
+  if (trigger.type === 'npc') {
+    if (live && live.onInteract) { live.onInteract(live); return true; }
+    if (trigger.id === 'toiletGuest') {
+      npcInteract({ id: 'toiletGuest', name: 'しゃがみ客' });
+      return true;
+    }
+    if (trigger.id === 'okami') {
+      npcInteract({ id: 'okami', name: '女将' });
+      return true;
+    }
+    return false;
+  }
+  if (trigger.type === 'item') {
+    if (live && live.onInteract) { live.onInteract(live); return true; }
+    itemInteract({ id: trigger.id, label: fallbackLabels[trigger.id] || trigger.id });
+    return true;
+  }
+  return false;
+}
+
+function canDirectStepInteract(def){
+  if (!def || !def.trigger || state.area !== def.targetArea || !def.targetPos) return false;
+  const dx = player.x - def.targetPos.x;
+  const dz = player.z - def.targetPos.z;
+  let radius = def.trigger.type === 'door' ? 3.4 : 2.9;
+  if (def.trigger.id === 'registerBook') radius = 4.2;
+  if (def.trigger.id === 'posterBoard') radius = 3.8;
+  if (def.trigger.id === 'futonBed') radius = 3.6;
+  if (def.trigger.id === 'toiletGuest') radius = 3.1;
+  return Math.hypot(dx, dz) <= radius;
+}
+
 function interact(){
   unlockAudio();
   if (state.menuOpen) return;
   if (!dialogueOverlay.classList.contains('hidden')) return;
+  const def = currentStep();
   if (state.area === 'lobby' && (state.step === 'inspect_register' || state.step === 'inspect_guestbook_203')) {
     const inRegisterZone = Math.abs(player.x - 1.1) < 1.9 && player.z < -1.6 && player.z > -4.8;
     if (inRegisterZone) {
@@ -3184,15 +3258,19 @@ function interact(){
       return;
     }
   }
+  if (canDirectStepInteract(def) && dispatchTrigger(def.trigger)) {
+    playSfx('ui_tap');
+    return;
+  }
   const target = getNearestInteractable();
   if (!target) return;
   playSfx('ui_tap');
   if (target.type === 'door') {
     useDoor(target.entity);
   } else if (target.type === 'npc') {
-    target.entity.onInteract(target.entity);
+    if (target.entity.onInteract) target.entity.onInteract(target.entity); else npcInteract(target.entity);
   } else if (target.type === 'item') {
-    target.entity.onInteract(target.entity);
+    if (target.entity.onInteract) target.entity.onInteract(target.entity); else itemInteract(target.entity);
   }
 }
 
@@ -3272,8 +3350,21 @@ function useDoor(door){
 
 function updatePrompt(){
   const now = performance.now();
+  if (state.menuOpen || !dialogueOverlay.classList.contains('hidden') || now < state.inputLockUntil) {
+    promptEl.classList.remove('show');
+    return;
+  }
+  const def = currentStep();
+  if (canDirectStepInteract(def) && def && def.trigger) {
+    const type = def.trigger.type;
+    const label = fallbackLabels[def.trigger.id] || (getLiveEntityForTrigger(def.trigger)?.label) || (type === 'npc' ? '対象' : '対象');
+    const kind = type === 'door' ? '入る / 移動' : (type === 'npc' ? '話す' : '調べる');
+    promptEl.textContent = 'E / ACT : ' + label + ' / ' + kind;
+    promptEl.classList.add('show');
+    return;
+  }
   const obj = getNearestInteractable();
-  if (!obj || state.menuOpen || !dialogueOverlay.classList.contains('hidden') || now < state.inputLockUntil) {
+  if (!obj) {
     promptEl.classList.remove('show');
     return;
   }
