@@ -3034,11 +3034,27 @@ function finishEnding(type){
 }
 
 function currentStep(){ return stepDefs[state.step] || stepDefs.start_note; }
+function rebuildAreaPreservePlayer(){
+  if (!state.area) return;
+  const px = player.x, pz = player.z, pyaw = player.yaw, ppitch = player.pitch;
+  const prevInputLock = state.inputLockUntil || 0;
+  const prevDoorCooldown = state.doorCooldownUntil || 0;
+  buildArea(state.area);
+  player.x = px; player.z = pz; player.yaw = pyaw; player.pitch = ppitch;
+  audioState.prevX = player.x;
+  audioState.prevZ = player.z;
+  state.inputLockUntil = prevInputLock;
+  state.doorCooldownUntil = prevDoorCooldown;
+}
 function setStep(id){
+  const prevArea = state.area;
+  const prevStep = state.step;
   state.step = id;
   const def = currentStep();
   dayLabelEl.textContent = 'DAY ' + def.day;
   phaseLabelEl.textContent = def.phase;
+  const shouldRefreshCurrentArea = !!(prevArea && def && def.targetArea === prevArea);
+  if (shouldRefreshCurrentArea) rebuildAreaPreservePlayer();
   saveToSlot(1, true);
 }
 

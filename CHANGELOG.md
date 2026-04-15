@@ -76,3 +76,5 @@
 - Updated guide portrait asset binding.
 
 - B28: chase spawn safety, guide always-front texture, okami cutscene path fix.
+
+- b32: 同一エリア内で進行ステップが変わった時に、その場で対象物が出現するようエリア再構築を追加。
