@@ -298,6 +298,10 @@ function refreshAmbience(force){
       addAmbienceNoise(0.013, 'bandpass', 240, 0.8);
       addAmbienceTone('sine', 55, 0.0032);
       break;
+    case 'oldhall':
+      addAmbienceNoise(0.014, 'bandpass', 720, 0.58);
+      addAmbienceTone('triangle', 72, 0.0034);
+      break;
     default:
       addAmbienceNoise(0.007, 'lowpass', 380, 0.7);
       break;
@@ -315,7 +319,8 @@ function areaStepSoundId(){
     case 'town': return 'step_outdoor';
     case 'bath': return 'step_tile';
     case 'archive':
-    case 'detached': return 'step_oldwood';
+    case 'detached':
+    case 'oldhall': return 'step_oldwood';
     default: return 'step_wood';
   }
 }
@@ -446,6 +451,10 @@ function maybeTriggerAreaAudio(now, dt){
     if (Math.random() < 0.5) playSfx('distant_step');
     else playSfx('metal_rattle');
   }
+  if (state.area === 'oldhall' && now - (last.oldHallFx || 0) > 9000 && Math.random() < dt * 0.35) {
+    last.oldHallFx = now;
+    playNoiseBurst({ dur: 0.18, gain: 0.018, freq: 950, q: 0.55, filterType: 'bandpass', pan: Math.random() < 0.5 ? -0.7 : 0.7 });
+  }
   if (state.area === 'town' && now - (last.townWind || 0) > 12000 && Math.random() < dt * 0.28) {
     last.townWind = now;
     playNoiseBurst({ dur: 0.24, gain: 0.018, freq: 1200, q: 0.4, filterType: 'bandpass' });
@@ -472,6 +481,11 @@ function ensureQuestFlagDefaults(flags){
   q.readBlueNote2 ??= false;
   q.sawGuideTease2 ??= false;
   q.entered203Phantom ??= false;
+  q.oldWingDoorOpened ??= false;
+  q.oldHallWindowScare1 ??= false;
+  q.oldHallWindowBang ??= false;
+  q.oldHallGardenScare ??= false;
+  q.oldHallEndChecked ??= false;
   q.endingType ??= '';
   return q;
 }
@@ -485,7 +499,7 @@ let interactionMarker = null;
 const graph = {
   home: { town: 12 },
   town: { home: 12, lobby: 18 },
-  lobby: { town: 18, corridor: 12, kitchen: 8, archive: 9 },
+  lobby: { town: 18, corridor: 12, kitchen: 8, archive: 9, oldhall: 8 },
   kitchen: { lobby: 8 },
   corridor: { lobby: 12, room201: 6, room202: 7, bath: 12, north: 13 },
   room201: { corridor: 6 },
@@ -493,11 +507,12 @@ const graph = {
   bath: { corridor: 12 },
   archive: { lobby: 9, detached: 14 },
   north: { corridor: 13, detached: 8 },
-  detached: { north: 8, archive: 14 }
+  detached: { north: 8, archive: 14 },
+  oldhall: { lobby: 8 }
 };
 
 const areaLabels = {
-  home: '自宅', town: '田舎町', lobby: '帳場', kitchen: '厨房', corridor: '客室廊下', room201: '201号室', room202: '202号室', bath: '浴場前', archive: '宿帳庫', north: '北廊下', detached: '離れ通路'
+  home: '自宅', town: '田舎町', lobby: '帳場', kitchen: '厨房', corridor: '客室廊下', room201: '201号室', room202: '202号室', bath: '浴場前', archive: '宿帳庫', north: '北廊下', detached: '離れ通路', oldhall: '旧館渡り廊下'
 };
 
 const stepDefs = {
@@ -536,6 +551,8 @@ const stepDefs = {
   talk_toilet_guest_day3: { day: 3, phase: '夕方', text: '浴場の個室の客にもう一度話しかける', sub: '浴場前へ', targetArea: 'bath', targetPos: { x: 6.15, z: 1.42 }, trigger: { type: 'npc', id: 'toiletGuest' } },
   get_toilet_paper_day3: { day: 3, phase: '夕方', text: '浴場の棚からトイレットペーパーを持ってくる', sub: '紙棚へ', targetArea: 'bath', targetPos: { x: 4.75, z: 2.2 }, trigger: { type: 'item', id: 'toiletPaperRoll' } },
   give_toilet_paper_day3: { day: 3, phase: '夕方', text: '個室の客へトイレットペーパーを渡す', sub: 'しゃがみ客へ', targetArea: 'bath', targetPos: { x: 6.15, z: 1.42 }, trigger: { type: 'npc', id: 'toiletGuest' } },
+  open_old_wing_door: { day: 3, phase: '夕方', text: '旧館の鍵で番台裏の鉄扉を開ける', sub: '鉄扉へ', targetArea: 'lobby', targetPos: { x: 5.6, z: -6.1 }, trigger: { type: 'item', id: 'oldWingDoorLock' } },
+  cross_old_glass_corridor: { day: 3, phase: '夕方', text: 'ガラス張りの渡り廊下を奥へ進む', sub: '旧館入口へ', targetArea: 'oldhall', targetPos: { x: 0.0, z: -13.2 }, trigger: { type: 'item', id: 'oldHallEndDoor' } },
   inspect_bath_notice: { day: 3, phase: '夕方', text: '女湯前の清掃案内を調べる', sub: '女湯前へ', targetArea: 'bath', targetPos: { x: -3.45, z: 2.85 }, trigger: { type: 'item', id: 'bathNotice' } },
   inspect_fire_map: { day: 3, phase: '夜', text: '北廊下で古い避難図を探す', sub: '北廊下へ', targetArea: 'north', targetPos: { x: 1.9, z: -1.2 }, trigger: { type: 'item', id: 'fireMap' } },
   read_blue_note_2: { day: 3, phase: '夜', text: '宿帳庫で青いノートの続きを読む', sub: '宿帳庫へ', targetArea: 'archive', targetPos: { x: -1.6, z: -2.1 }, trigger: { type: 'item', id: 'blueLedger2' } },
@@ -564,6 +581,8 @@ graph.north.detached = 10;
 graph.detached.north = 10;
 graph.archive.detached = 16;
 graph.detached.archive = 16;
+graph.lobby.oldhall = 8;
+graph.oldhall = { lobby: 8 };
 
 const storyNodes = {
   home_note: [
@@ -713,6 +732,15 @@ const storyNodes = {
     ['しゃがみ客', `名前を書くな。203は部屋じゃない。
 空いた席に、客の形を流し込むための番号だ。`, 'guest'],
     ['主人公', `錆びた古い鍵を受け取った。`, 'hero']
+  ],
+  oldWingDoorOpen: [
+    ['主人公', `錆びた鍵を差し込むと、鉄扉の奥で重い部品がずれた。`, 'hero'],
+    ['主人公', `番台の裏に、こんな長い廊下が隠れていたのか。`, 'hero']
+  ],
+  oldGlassCorridorEnd: [
+    ['主人公', `ガラスの向こうに庭園が見える。池、石灯籠、枯れた枝。`, 'hero'],
+    ['主人公', `でも、外が見えているのに逃げられる気がしない。`, 'hero'],
+    ['主人公', `奥の旧館入口は、内側から封じられている。\nここに残った焦げた案内札だけ、持ち帰れる。`, 'hero']
   ],
   toiletGuestDay3: [
     ['しゃがみ客', `……昨日より近い顔になったな。`, 'guest'],
@@ -943,7 +971,8 @@ const fallbackLabels = {
   blueLedger: '青い宿帳',
   blueLedger2: '青いノート',
   phantom203: '203の痕跡',
-  oldWingDoorLock: '鉄扉'
+  oldWingDoorLock: '鉄扉',
+  oldHallEndDoor: '旧館入口'
 };
 
 const portraitPaths = {
@@ -1074,6 +1103,7 @@ function updateCutscene(dt){
 function clearPreviewGuide(){
   if (state.previewGuide && state.previewGuide.group) dynamicGroup.remove(state.previewGuide.group);
   state.previewGuide = null;
+  state.oldHallScareMesh = null;
 }
 function spawnPreviewGuide(x, z, yaw){
   clearPreviewGuide();
@@ -2023,6 +2053,7 @@ function buildArea(areaId){
   else if (areaId === 'archive') buildArchive();
   else if (areaId === 'north') buildNorth();
   else if (areaId === 'detached') buildDetached();
+  else if (areaId === 'oldhall') buildOldHall();
 }
 
 
@@ -2616,12 +2647,105 @@ function buildBath(){
       } else if (state.step === 'give_toilet_paper_day3' && state.questFlags.hasToiletPaper) {
         state.questFlags.hasToiletPaper = false;
         state.questFlags.hasOldWingKey = true;
-        showDialogue(storyNodes.toiletGuestReward, ()=> setStep('inspect_bath_notice'));
+        showDialogue(storyNodes.toiletGuestReward, ()=> setStep('open_old_wing_door'));
       } else {
         showDialogue([['しゃがみ客','……今は話しかけないでくれ。','guest']], ()=>{});
       }
     });
   }
+}
+
+
+function addOldHallGardenSide(side){
+  const sx = side > 0 ? 4.05 : -4.05;
+  const grass = new THREE.Mesh(new THREE.BoxGeometry(3.2,0.04,23.5), new THREE.MeshStandardMaterial({ color: 0x263c2c, roughness: 1 }));
+  grass.position.set(sx, -0.12, -3.2); grass.receiveShadow = true; areaGroup.add(grass);
+  for (const z of [4.2, 0.4, -3.2, -7.6, -11.3]) {
+    const stone = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.38,0.09,16), new THREE.MeshStandardMaterial({ color: 0x75756b, roughness: 1 }));
+    stone.position.set(sx + side * 0.26, -0.04, z); stone.scale.x = 1.35; areaGroup.add(stone);
+  }
+  for (const z of [2.4, -5.6, -10.8]) {
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.38,0.18,0.38), materials.darkWood); base.position.set(sx,0.09,z); areaGroup.add(base);
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.62,0.12), materials.darkWood); pole.position.set(sx,0.43,z); areaGroup.add(pole);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.44,0.18,0.44), new THREE.MeshStandardMaterial({ color:0x2f2a23, roughness:1 })); cap.position.set(sx,0.82,z); areaGroup.add(cap);
+    const glow = new THREE.PointLight(0xffc680, 0.25, 3.4, 2.2); glow.position.set(sx,0.85,z); areaGroup.add(glow);
+  }
+  for (const z of [5.0, -1.2, -8.8]) addTree(sx + side * 0.55, z, 0.55);
+}
+
+function spawnOldHallWindowGuide(x, z, ms=900){
+  if (state.oldHallScareMesh) dynamicGroup.remove(state.oldHallScareMesh);
+  const g = makeCharacter('guide', 0x2f4d7d);
+  g.position.set(x, 0, z);
+  dynamicGroup.add(g);
+  const ent = { group:g, x, z, rot: Math.PI };
+  updateCharacterBillboard(ent);
+  state.oldHallScareMesh = g;
+  window.setTimeout(() => {
+    if (state.oldHallScareMesh === g) {
+      dynamicGroup.remove(g);
+      state.oldHallScareMesh = null;
+    }
+  }, ms);
+}
+
+function updateOldHallScares(){
+  if (state.area !== 'oldhall' || state.step !== 'cross_old_glass_corridor' || state.menuOpen) return;
+  if (!state.questFlags.oldHallWindowScare1 && player.z < 3.2) {
+    state.questFlags.oldHallWindowScare1 = true;
+    playSfx('scare_sting');
+    spawnOldHallWindowGuide(3.25, 2.35, 850);
+  }
+  if (!state.questFlags.oldHallWindowBang && player.z < -2.1) {
+    state.questFlags.oldHallWindowBang = true;
+    playSfx('stall_slam');
+    const hand = makeTextPlane('手形', 0.8, 0.28, { fg:'#d6d6d2', bg:'rgba(0,0,0,.12)', fontSize:76 });
+    hand.position.set(-2.55, 1.55, -2.8); hand.rotation.y = Math.PI/2; dynamicGroup.add(hand);
+    window.setTimeout(()=>{ dynamicGroup.remove(hand); }, 1700);
+  }
+  if (!state.questFlags.oldHallGardenScare && player.z < -8.1) {
+    state.questFlags.oldHallGardenScare = true;
+    playSfx('distant_step');
+    spawnOldHallWindowGuide(-3.25, -8.55, 1150);
+  }
+}
+
+function buildOldHall(){
+  createFloor(6.2, 24.5, materials.darkWood, -0.1);
+  createCeiling(6.2, 24.5, 0x241b16);
+  scene.fog.color.set(0x16191b);
+  scene.fog.near = 5.5; scene.fog.far = 23;
+  addLamp(0, 5.1, 0.65, 0xffcf94);
+  addLamp(0, -1.8, 0.48, 0xffb884);
+  addLamp(0, -9.2, 0.42, 0xffaa70);
+  addFloorShadow(0, -3.2, 5.6, 22.4, 0.18, 0);
+  wallSegment(0, 7.05, 6.2, 3.2, 0.28, materials.wallDark);
+  wallSegment(0, -15.2, 6.2, 3.2, 0.28, materials.wallDark);
+  addBoxCollider(-3.15, -3.6, 0.22, 23.2);
+  addBoxCollider(3.15, -3.6, 0.22, 23.2);
+  const glassMat = new THREE.MeshStandardMaterial({ color:0x9fb6c4, roughness:0.15, metalness:0.03, transparent:true, opacity:0.27 });
+  for (const side of [-1,1]) {
+    for (let z=5.0; z>-14.0; z-=2.15) {
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(0.04,1.95,1.55), glassMat);
+      pane.position.set(side*3.02,1.45,z); pane.castShadow=false; pane.receiveShadow=true; areaGroup.add(pane);
+      const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.14,2.45,0.12), materials.darkWood);
+      mullion.position.set(side*2.95,1.25,z-0.88); areaGroup.add(mullion);
+    }
+    const railLow = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.16,21.4), materials.darkWood); railLow.position.set(side*2.96,0.72,-3.7); areaGroup.add(railLow);
+    const railHigh = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.16,21.4), materials.darkWood); railHigh.position.set(side*2.96,2.18,-3.7); areaGroup.add(railHigh);
+    addOldHallGardenSide(side);
+  }
+  for (const [x,z,r] of [[-2.15,1.2,0.2],[2.1,-4.3,-0.12],[-2.15,-10.4,0.35]]) {
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.05,0.22), materials.wood); plank.position.set(x,0.02,z); plank.rotation.y=r; areaGroup.add(plank);
+  }
+  addAndonLamp(-2.1, -6.0, 0.78);
+  addUmbrellaStand(2.15, 4.2, 0.82, -0.2);
+  addDoor('oldHallToLobby','帳場へ戻る',0,6.9,1.25,'lobby',{x:5.35,z:-5.55,yaw:Math.PI*0.05},null,0x5b5961);
+  const endDoor = new THREE.Mesh(new THREE.BoxGeometry(1.85,2.45,0.18), new THREE.MeshStandardMaterial({ color:0x2a2c31, roughness:0.75, metalness:0.35 }));
+  endDoor.position.set(0,1.22,-14.92); endDoor.castShadow=endDoor.receiveShadow=true; areaGroup.add(endDoor);
+  const sign = makeTextPlane('旧館入口',1.1,0.26,{fg:'#e8dfcc',bg:'rgba(0,0,0,.35)',fontSize:78}); sign.position.set(0,2.68,-14.78); areaGroup.add(sign);
+  addItem('oldHallEndDoor','旧館入口',0,-13.2,new THREE.Mesh(new THREE.BoxGeometry(1.6,0.1,1.0), new THREE.MeshBasicMaterial({ transparent:true, opacity:0.01 })), itemInteract);
+  const note = makeTextPlane('焦げた案内札',1.0,0.26,{fg:'#332820',bg:'rgba(237,226,194,.92)',fontSize:72}); note.position.set(-1.4,1.18,-13.35); note.rotation.y=0.25; areaGroup.add(note);
 }
 
 
@@ -2801,7 +2925,7 @@ function npcInteract(entity){
     } else if (state.step === 'give_toilet_paper_day3' && state.questFlags.hasToiletPaper) {
       state.questFlags.hasToiletPaper = false;
       state.questFlags.hasOldWingKey = true;
-      showDialogue(storyNodes.toiletGuestReward, () => setStep('inspect_bath_notice'));
+      showDialogue(storyNodes.toiletGuestReward, () => setStep('open_old_wing_door'));
     } else if (state.step === 'give_toilet_paper_day3') {
       showDialogue([['しゃがみ客','……紙を先に持ってきてくれ。','guest']], ()=>{});
     } else {
@@ -2845,8 +2969,23 @@ function itemInteract(entity){
     showDialogue(storyNodes.phone, () => setStep('inspect_archive'));
   } else if (entity.id === 'oldWingDoorLock') {
     playSfx('metal_rattle');
-    if (state.questFlags.hasOldWingKey) {
-      showDialogue([['主人公','錆びた鍵が手の中で冷たい。番台裏の鉄扉に、たしかに合いそうだ。','hero'], ['主人公','……けど、今はまだ開ける時じゃない。宿の記録を先に追う。','hero']], ()=>{});
+    if (state.questFlags.hasOldWingKey && (state.step === 'open_old_wing_door' || (state.questFlags.oldWingDoorOpened && state.step === 'cross_old_glass_corridor'))) {
+      state.questFlags.oldWingDoorOpened = true;
+      showDialogue(storyNodes.oldWingDoorOpen, () => {
+        playSfx('door_open');
+        state.area = 'oldhall';
+        buildArea(state.area);
+        player.x = 0;
+        player.z = 6.0;
+        player.yaw = Math.PI;
+        player.pitch = -0.04;
+        resetInput();
+        state.inputLockUntil = performance.now() + 550;
+        state.doorCooldownUntil = performance.now() + 900;
+        setStep('cross_old_glass_corridor');
+      });
+    } else if (state.questFlags.hasOldWingKey) {
+      showDialogue([['主人公','錆びた鍵が手の中で冷たい。番台裏の鉄扉に合いそうだ。','hero'], ['主人公','旧館へ続く扉だ。入るなら、いまは覚悟を決めてからにしたい。','hero']], ()=>{});
     } else {
       showDialogue([['主人公','重たい鉄扉だ。鍵穴が新しく、今の鍵束では開きそうにない。','hero'], ['主人公','向こうは旧館へ続いている……後で入る方法を探そう。','hero']], ()=>{});
     }
@@ -2920,6 +3059,11 @@ function itemInteract(entity){
     removeItem(entity.id);
     state.questFlags.hasToiletPaper = true;
     showDialogue(storyNodes.foundToiletPaper, () => setStep('give_toilet_paper_day3'));
+  } else if (entity.id === 'oldHallEndDoor' && state.step === 'cross_old_glass_corridor') {
+    playSfx('scare_sting');
+    state.questFlags.oldHallEndChecked = true;
+    spawnOldHallWindowGuide(2.85, -12.6, 1200);
+    showDialogue(storyNodes.oldGlassCorridorEnd, () => setStep('inspect_bath_notice'));
   } else if (entity.id === 'bathNotice' && state.step === 'inspect_bath_notice') {
     playSfx('paper');
     state.questFlags.checkedBathNoticeDay3 = true;
@@ -3305,7 +3449,7 @@ function getNearestInteractable(){
     const dist = Math.hypot(dx, dz);
     const isCurrentTarget = !!(trigger && trigger.type === obj.type && trigger.id === obj.entity.id);
     const id = obj.entity && obj.entity.id;
-    const largePromptIds = new Set(['posterBoard','futonBed','scheduleNote','amenityBag','amenityBox','slipperRack','towelShelf','phone','registerBook','sealTag','altar','bathNotice','fireMap','blueLedger','blueLedger2','toiletStallDoor','phantom203','oldWingDoorLock']);
+    const largePromptIds = new Set(['posterBoard','futonBed','scheduleNote','amenityBag','amenityBox','slipperRack','towelShelf','phone','registerBook','sealTag','altar','bathNotice','fireMap','blueLedger','blueLedger2','toiletStallDoor','phantom203','oldWingDoorLock','oldHallEndDoor']);
     const bonusDist = largePromptIds.has(id) ? 1.8 : 0;
     const maxDist = obj.type === 'door' ? 3.1 : (isCurrentTarget ? 6.0 + bonusDist : 2.8 + bonusDist * 0.4);
     if (dist > maxDist) continue;
@@ -3573,6 +3717,7 @@ function update(){
   maybeStartLobbyArrivalCutscene();
   maybeStartArchiveGuideGlimpse();
   maybeStartDay3GuideTease();
+  updateOldHallScares();
   if (state.hudHidden) {
     hud.style.display = 'none';
     joystickZone.style.display = 'none';
