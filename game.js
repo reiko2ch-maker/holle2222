@@ -486,6 +486,7 @@ function ensureQuestFlagDefaults(flags){
   q.oldHallWindowBang ??= false;
   q.oldHallGardenScare ??= false;
   q.oldHallEndChecked ??= false;
+  q.oldWingCorrupted ??= false;
   q.endingType ??= '';
   return q;
 }
@@ -2054,6 +2055,7 @@ function buildArea(areaId){
   else if (areaId === 'north') buildNorth();
   else if (areaId === 'detached') buildDetached();
   else if (areaId === 'oldhall') buildOldHall();
+  applyOldWingCorruption();
 }
 
 
@@ -2689,24 +2691,111 @@ function spawnOldHallWindowGuide(x, z, ms=900){
   }, ms);
 }
 
+
+function lookYawToPoint(x, z){
+  return Math.atan2(player.x - x, player.z - z);
+}
+function forceLookAtPoint(x, z, pitch, duration){
+  const sy = player.yaw;
+  const sp = player.pitch;
+  const ey = lookYawToPoint(x, z);
+  const ep = typeof pitch === 'number' ? pitch : -0.03;
+  return {
+    duration: duration || 0.5,
+    onUpdate(t){
+      const e = easeInOut(t);
+      player.yaw = lerpAngle(sy, ey, e);
+      player.pitch = lerp(sp, ep, e);
+    },
+    onEnd(){ player.yaw = ey; player.pitch = ep; }
+  };
+}
+function startOldHallForcedScare(kind){
+  if (state.cutscene || state.menuOpen || state.area !== 'oldhall') return;
+  const px = player.x, pz = player.z;
+  if (kind === 'window1') {
+    const actor = spawnOldHallWindowGuide(3.25, 2.35, 1800);
+    playSfx('scare_sting');
+    startCutscene([
+      forceLookAtPoint(3.25, 2.35, -0.04, 0.38),
+      { duration: 0.82, onUpdate(){ if (actor) { actor.rot = Math.PI; updateCharacterBillboard(actor); } } },
+      { duration: 0.28, onUpdate(t){ player.yaw = lerpAngle(player.yaw, lookYawToPoint(px, pz - 3.0), easeInOut(t)); } }
+    ], ()=>{ saveToSlot(1, true); });
+    return;
+  }
+  if (kind === 'bang') {
+    const hand = makeTextPlane('手形', 0.82, 0.3, { fg:'#e8e2dc', bg:'rgba(120,0,0,.24)', fontSize:76 });
+    hand.position.set(-2.55, 1.55, -2.8); hand.rotation.y = Math.PI/2; dynamicGroup.add(hand);
+    startCutscene([
+      { duration: 0.18, onStart(){ playSfx('stall_slam'); }, onUpdate(t){ player.yaw += Math.sin(t * Math.PI * 8) * 0.01; } },
+      forceLookAtPoint(-2.55, -2.8, -0.02, 0.42),
+      { duration: 0.78 },
+      { duration: 0.25, onEnd(){ dynamicGroup.remove(hand); } }
+    ], ()=>{ saveToSlot(1, true); });
+    return;
+  }
+  if (kind === 'garden') {
+    const actor = spawnOldHallWindowGuide(-3.25, -8.55, 2100);
+    playSfx('distant_step');
+    startCutscene([
+      forceLookAtPoint(-3.25, -8.55, -0.03, 0.42),
+      { duration: 1.05, onUpdate(){ if (actor) { actor.rot = Math.PI * 0.1; updateCharacterBillboard(actor); } } },
+      { duration: 0.4, onStart(){ playSfx('scare_sting'); } }
+    ], ()=>{ saveToSlot(1, true); });
+  }
+}
+function applyOldWingCorruption(){
+  if (!state.questFlags.oldWingCorrupted) return;
+  if (state.area === 'home' || state.area === 'town' || state.area === 'oldhall') return;
+  scene.background = new THREE.Color(0x120305);
+  scene.fog.color.set(0x280306);
+  scene.fog.near = Math.min(scene.fog.near || 12, 10);
+  scene.fog.far = Math.max(scene.fog.far || 34, 30);
+  hemi.intensity = Math.max(0.28, hemi.intensity * 0.62);
+  dirLight.intensity = Math.max(0.22, dirLight.intensity * 0.5);
+  const red = new THREE.PointLight(0xff1f1f, 0.95, 11, 2.2);
+  red.position.set(0, 1.55, -1.2);
+  areaGroup.add(red);
+  const red2 = new THREE.PointLight(0x8b0000, 0.55, 8, 2.4);
+  red2.position.set(-4.2, 1.35, 3.4);
+  areaGroup.add(red2);
+  const hazeMat = new THREE.MeshBasicMaterial({ color:0x8c0b0b, transparent:true, opacity:0.08, depthWrite:false, side:THREE.DoubleSide });
+  const haze = new THREE.Mesh(new THREE.PlaneGeometry(18, 10), hazeMat);
+  haze.position.set(0, 1.35, -1.0);
+  haze.rotation.x = -Math.PI / 2;
+  areaGroup.add(haze);
+  const bloodMat = new THREE.MeshBasicMaterial({ color:0x4c0000, transparent:true, opacity:0.55, depthWrite:false });
+  const spots = [
+    [-3.4,-2.8,0.85,0.28,0.2], [2.2,1.9,0.65,0.22,-0.35], [0.6,-4.2,1.25,0.18,0.05], [4.1,3.3,0.52,0.2,0.8]
+  ];
+  spots.forEach(([x,z,w,d,r])=>{
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w,d), bloodMat);
+    m.position.set(x, 0.024, z); m.rotation.x = -Math.PI/2; m.rotation.z = r; areaGroup.add(m);
+  });
+  for (const [x,z,r] of [[-5.2,0.8,0.18],[3.8,-3.4,-0.24],[0.8,4.8,0.4]]) {
+    const board = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.045,0.18), materials.darkWood);
+    board.position.set(x,0.045,z); board.rotation.y = r; areaGroup.add(board);
+  }
+  if (Math.random() < 0.55) {
+    const stain = makeTextPlane(' ', 1.05, 0.38, { fg:'#5c0000', bg:'rgba(90,0,0,.42)', fontSize:72 });
+    stain.position.set(0,1.55,-6.84); areaGroup.add(stain);
+  }
+}
 function updateOldHallScares(){
-  if (state.area !== 'oldhall' || state.step !== 'cross_old_glass_corridor' || state.menuOpen) return;
+  if (state.area !== 'oldhall' || state.step !== 'cross_old_glass_corridor' || state.menuOpen || state.cutscene) return;
   if (!state.questFlags.oldHallWindowScare1 && player.z < 3.2) {
     state.questFlags.oldHallWindowScare1 = true;
-    playSfx('scare_sting');
-    spawnOldHallWindowGuide(3.25, 2.35, 850);
+    startOldHallForcedScare('window1');
+    return;
   }
   if (!state.questFlags.oldHallWindowBang && player.z < -2.1) {
     state.questFlags.oldHallWindowBang = true;
-    playSfx('stall_slam');
-    const hand = makeTextPlane('手形', 0.8, 0.28, { fg:'#d6d6d2', bg:'rgba(0,0,0,.12)', fontSize:76 });
-    hand.position.set(-2.55, 1.55, -2.8); hand.rotation.y = Math.PI/2; dynamicGroup.add(hand);
-    window.setTimeout(()=>{ dynamicGroup.remove(hand); }, 1700);
+    startOldHallForcedScare('bang');
+    return;
   }
   if (!state.questFlags.oldHallGardenScare && player.z < -8.1) {
     state.questFlags.oldHallGardenScare = true;
-    playSfx('distant_step');
-    spawnOldHallWindowGuide(-3.25, -8.55, 1150);
+    startOldHallForcedScare('garden');
   }
 }
 
@@ -3062,6 +3151,7 @@ function itemInteract(entity){
   } else if (entity.id === 'oldHallEndDoor' && state.step === 'cross_old_glass_corridor') {
     playSfx('scare_sting');
     state.questFlags.oldHallEndChecked = true;
+    state.questFlags.oldWingCorrupted = true;
     spawnOldHallWindowGuide(2.85, -12.6, 1200);
     showDialogue(storyNodes.oldGlassCorridorEnd, () => setStep('inspect_bath_notice'));
   } else if (entity.id === 'bathNotice' && state.step === 'inspect_bath_notice') {
@@ -3484,6 +3574,9 @@ function useDoor(door){
   returnHomeEl.classList.add('hidden');
   const doorSfx = door.style === 'fusuma' ? 'door_slide' : (door.style === 'noren' ? 'door_noren' : 'door_open');
   playSfx(doorSfx);
+  if (door.id === 'oldHallToLobby' || (leavingArea === 'oldhall' && door.toArea === 'lobby')) {
+    state.questFlags.oldWingCorrupted = true;
+  }
   state.area = door.toArea;
   buildArea(state.area);
   player.x = door.toSpawn.x;
