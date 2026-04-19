@@ -3299,6 +3299,7 @@ function itemInteract(entity){
       finishEnding('guest');
     });
   } else if (entity.id === 'endingFollow' && state.step === 'choose_fate') {
+    state.questFlags.finalChoiceFollowSeen = true;
     showDialogue(storyNodes.ending_replace, () => {
       askReplaceEndingChoice();
     });
@@ -3402,15 +3403,17 @@ function showChoiceOverlay(title, choices){
 }
 
 function askReplaceEndingChoice(){
+  state.questFlags.replaceChoiceSeen = true;
   showChoiceOverlay('誘導員の役目を引き継ぎますか？', [
-    { label: 'はい', action: () => showDialogue(storyNodes.replaceEndingMovieIntro, startReplaceEndingMovie) },
-    { label: 'いいえ', action: () => beginOldWingDeepRoute() }
+    { label: 'はい', action: () => { playSfx('ui_tap'); showDialogue(storyNodes.replaceEndingMovieIntro, startReplaceEndingMovie); } },
+    { label: 'いいえ', action: () => { playSfx('ui_tap'); beginOldWingDeepRoute(); } }
   ]);
 }
 
 function beginOldWingDeepRoute(){
   state.questFlags.oldWingDeepRouteStarted = true;
   state.questFlags.oldWingRandomChaseArmed = true;
+  state.questFlags.oldWingDoorOpened = true;
   showDialogue(storyNodes.refuseReplaceRoute, () => {
     playSfx('door_open');
     state.area = 'oldwing';
@@ -3423,15 +3426,19 @@ function beginOldWingDeepRoute(){
     state.inputLockUntil = performance.now() + 700;
     state.doorCooldownUntil = performance.now() + 900;
     setStep('oldwing_search_key');
+    buildArea(state.area);
+    player.x = 0; player.z = 6.2; player.yaw = Math.PI; player.pitch = -0.05;
     showDialogue(storyNodes.oldWingDeepStart, () => { saveToSlot(1, true); });
   });
 }
 
 function startReplaceEndingMovie(){
   state.questFlags.replaceEndingMovieSeen = true;
+  stopChase();
   state.area = 'archive';
   buildArea(state.area);
-  stopChase();
+  state.menuOpen = false;
+  state.cutscene = false;
   player.x = 0.2; player.z = 5.2; player.yaw = Math.PI; player.pitch = -0.02;
   resetInput();
   const guest = makeCharacter('yukata');
