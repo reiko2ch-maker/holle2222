@@ -302,6 +302,10 @@ function refreshAmbience(force){
       addAmbienceNoise(0.014, 'bandpass', 720, 0.58);
       addAmbienceTone('triangle', 72, 0.0034);
       break;
+    case 'oldwing':
+      addAmbienceNoise(0.016, 'bandpass', 360, 0.7);
+      addAmbienceTone('sine', 48, 0.0042);
+      break;
     default:
       addAmbienceNoise(0.007, 'lowpass', 380, 0.7);
       break;
@@ -320,7 +324,8 @@ function areaStepSoundId(){
     case 'bath': return 'step_tile';
     case 'archive':
     case 'detached':
-    case 'oldhall': return 'step_oldwood';
+    case 'oldhall':
+    case 'oldwing': return 'step_oldwood';
     default: return 'step_wood';
   }
 }
@@ -487,6 +492,10 @@ function ensureQuestFlagDefaults(flags){
   q.oldHallGardenScare ??= false;
   q.oldHallEndChecked ??= false;
   q.oldWingCorrupted ??= false;
+  q.oldWingDeepRouteStarted ??= false;
+  q.oldWingDeepKeyFound ??= false;
+  q.oldWingRandomChaseArmed ??= false;
+  q.replaceEndingMovieSeen ??= false;
   q.endingType ??= '';
   return q;
 }
@@ -509,11 +518,12 @@ const graph = {
   archive: { lobby: 9, detached: 14 },
   north: { corridor: 13, detached: 8 },
   detached: { north: 8, archive: 14 },
-  oldhall: { lobby: 8 }
+  oldhall: { lobby: 8, oldwing: 8 },
+  oldwing: { oldhall: 8, lobby: 10 }
 };
 
 const areaLabels = {
-  home: '自宅', town: '田舎町', lobby: '帳場', kitchen: '厨房', corridor: '客室廊下', room201: '201号室', room202: '202号室', bath: '浴場前', archive: '宿帳庫', north: '北廊下', detached: '離れ通路', oldhall: '旧館渡り廊下'
+  home: '自宅', town: '田舎町', lobby: '帳場', kitchen: '厨房', corridor: '客室廊下', room201: '201号室', room202: '202号室', bath: '浴場前', archive: '宿帳庫', north: '北廊下', detached: '離れ通路', oldhall: '旧館渡り廊下', oldwing: '旧館深部'
 };
 
 const stepDefs = {
@@ -563,7 +573,9 @@ const stepDefs = {
   choose_fate: { day: 3, phase: '終幕', text: '番台に置かれた三つの品から答えを選ぶ', sub: '番台へ', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingBurn' } },
   ending_return: { day: 3, phase: '結末', text: '帰還エンド', sub: '帰還', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingBurn' } },
   ending_guest: { day: 3, phase: '結末', text: '宿泊エンド', sub: '宿泊', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingSign' } },
-  ending_replace: { day: 3, phase: '結末', text: '交代エンド', sub: '交代', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingFollow' } }
+  ending_replace: { day: 3, phase: '結末', text: '交代エンド', sub: '交代', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingFollow' } },
+  oldwing_search_key: { day: 3, phase: '旧館', text: '旧館で鍵を探す', sub: '鍵を探す', targetArea: 'oldwing', targetPos: { x: 6.2, z: -5.2 }, trigger: { type: 'item', id: 'oldWingDeepKey' } },
+  oldwing_key_obtained: { day: 3, phase: '旧館', text: '見つけた鍵で旧館のさらに奥を目指す', sub: '旧館奥へ', targetArea: 'oldwing', targetPos: { x: 0.0, z: -8.3 }, trigger: { type: 'item', id: 'oldWingInnerDoor' } }
 };
 
 
@@ -583,7 +595,8 @@ graph.detached.north = 10;
 graph.archive.detached = 16;
 graph.detached.archive = 16;
 graph.lobby.oldhall = 8;
-graph.oldhall = { lobby: 8 };
+graph.oldhall = { lobby: 8, oldwing: 8 };
+graph.oldwing = { oldhall: 8, lobby: 10 };
 
 const storyNodes = {
   home_note: [
@@ -795,6 +808,38 @@ const storyNodes = {
   ending_replace: [
     ['主人公', `笛を握ると、濡れた廊下の匂いが肺に流れ込む。`, 'hero'],
     ['誘導員', `……今度は、間違えるな。`, 'guide']
+  ],
+  replaceEndingMovieIntro: [
+    ['女将', `……そう。役目を受け取るんだね。`, 'okami'],
+    ['女将', `なら、今夜の仕事を見せてあげる。あなたがこれから何をするのか。`, 'okami']
+  ],
+  replaceEndingMovieAfter: [
+    ['主人公', `深夜。宿帳庫。`, 'hero'],
+    ['主人公', `逃げる客の名前は、宿帳にまだ無かった。だから、書かせなければならなかった。`, 'hero'],
+    ['主人公', `棚の奥で音が止まり、紙をめくる音だけが残った。`, 'hero'],
+    ['女将', `よくできました。これで、今夜も空室は埋まりました。`, 'okami'],
+    ['主人公', `宿帳の端に、見慣れない筆跡で「案内済」と書かれている。`, 'hero']
+  ],
+  refuseReplaceRoute: [
+    ['女将', `……そう。なら、あなたは最後まで見なければいけない。`, 'okami'],
+    ['女将', `旧館の奥に、まだ閉じられていない記録がある。`, 'okami'],
+    ['主人公', `役目を拒むなら、自分で鍵を探せということか。`, 'hero']
+  ],
+  oldWingDeepStart: [
+    ['主人公', `旧館の空気は、本館よりずっと乾いている。`, 'hero'],
+    ['主人公', `目的は一つ。どこかにある鍵を見つける。`, 'hero']
+  ],
+  oldWingFoundKey: [
+    ['主人公', `錆びた鍵を見つけた。`, 'hero'],
+    ['主人公', `何の鍵かは分からない。でも、旧館の奥がこちらを待っている気がする。`, 'hero']
+  ],
+  oldWingInnerDoor: [
+    ['主人公', `鍵穴は合う。けれど、扉の向こうから湿った熱が漏れている。`, 'hero'],
+    ['主人公', `ここから先は、まだ戻れなくなる気がした。`, 'hero']
+  ],
+  hideSuccess: [
+    ['主人公', `息を殺す。`, 'hero'],
+    ['主人公', `足音が近づき、目の前で止まり、やがて遠ざかった。`, 'hero']
   ]
 };
 
@@ -973,7 +1018,12 @@ const fallbackLabels = {
   blueLedger2: '青いノート',
   phantom203: '203の痕跡',
   oldWingDoorLock: '鉄扉',
-  oldHallEndDoor: '旧館入口'
+  oldHallEndDoor: '旧館入口',
+  oldWingDeepKey: '旧館の鍵',
+  oldWingInnerDoor: '旧館奥の扉',
+  hideCloset1: '押し入れ',
+  hideShelf1: '倒れた棚',
+  hideFloor1: '床下収納'
 };
 
 const portraitPaths = {
@@ -2055,6 +2105,7 @@ function buildArea(areaId){
   else if (areaId === 'north') buildNorth();
   else if (areaId === 'detached') buildDetached();
   else if (areaId === 'oldhall') buildOldHall();
+  else if (areaId === 'oldwing') buildOldWing();
   applyOldWingCorruption();
 }
 
@@ -2838,6 +2889,73 @@ function buildOldHall(){
 }
 
 
+
+function buildOldWing(){
+  createFloor(18, 18, materials.darkWood, -0.1);
+  createCeiling(18, 18, 0x1d1512);
+  scene.background = new THREE.Color(0x070506);
+  scene.fog.color.set(0x160707);
+  scene.fog.near = 8;
+  scene.fog.far = 27;
+  hemi.intensity = 0.38;
+  dirLight.intensity = 0.22;
+  addFloorShadow(0, 0, 17, 17, 0.24, 0);
+  wallSegment(0, 9.1, 18, 3.2, 0.28, materials.wallDark);
+  wallSegment(0, -9.1, 18, 3.2, 0.28, materials.wallDark);
+  wallSegment(-9.1, 0, 0.28, 3.2, 18, materials.wallDark);
+  wallSegment(9.1, 0, 0.28, 3.2, 18, materials.wallDark);
+  wallSegment(-4.7, 2.4, 0.24, 2.9, 7.8, materials.wallDark);
+  wallSegment(4.7, 1.0, 0.24, 2.9, 6.3, materials.wallDark);
+  wallSegment(0, -1.15, 5.8, 2.9, 0.24, materials.wallDark);
+  wallSegment(-2.0, -5.9, 7.0, 2.9, 0.24, materials.wallDark);
+  wallSegment(5.2, -5.2, 0.24, 2.9, 4.2, materials.wallDark);
+  wallSegment(-6.6, -2.1, 0.24, 2.9, 4.4, materials.wallDark);
+  addLamp(0, 5.4, 0.58, 0xffb36c);
+  addLamp(-6.9, 1.9, 0.45, 0xff8f5a);
+  addLamp(6.9, -1.7, 0.43, 0xff8f5a);
+  addLamp(0, -7.0, 0.38, 0xff6b50);
+  addAndonLamp(-7.0, 5.4, 0.85);
+  addAndonLamp(7.0, 4.9, 0.75);
+  addAndonLamp(-1.9, -3.8, 0.68);
+  addUmbrellaStand(-6.7, -5.6, 0.7, 0.2);
+  addIkebana(3.7, 6.0, 0.62);
+  const labels = [
+    ['焼けた客室', -6.8, 0.4, Math.PI/2], ['物置', -6.8, -4.5, Math.PI/2], ['配膳室', 6.8, -0.8, -Math.PI/2], ['管理人室', 6.8, -5.9, -Math.PI/2]
+  ];
+  labels.forEach(([text,x,z,ry])=>{ const m = makeTextPlane(text,1.0,0.26,{fg:'#f4e6ce',bg:'rgba(0,0,0,.46)',fontSize:70}); m.position.set(x,1.62,z); m.rotation.y = ry; areaGroup.add(m); });
+  const stainMat = new THREE.MeshBasicMaterial({ color:0x5a0000, transparent:true, opacity:0.45, depthWrite:false });
+  [[-2.7,3.2,0.7,0.24,0.2],[2.9,-3.2,1.1,0.2,-0.4],[-6.2,-6.8,0.8,0.18,0.8]].forEach(([x,z,w,d,r])=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),stainMat); m.position.set(x,0.026,z); m.rotation.x=-Math.PI/2; m.rotation.z=r; areaGroup.add(m); });
+  for (const [x,z,r] of [[-1.2,1.7,0.3],[4.4,3.0,-0.25],[-3.7,-7.1,0.1],[2.4,-6.6,0.55]]) {
+    const board = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.05,0.18), materials.darkWood);
+    board.position.set(x,0.04,z); board.rotation.y=r; areaGroup.add(board);
+  }
+  addHideSpot('hideCloset1','押し入れに隠れる',-7.25,1.8, Math.PI/2, '押入');
+  addHideSpot('hideShelf1','棚裏に隠れる',1.8,-3.55, 0, '棚裏');
+  addHideSpot('hideFloor1','床下収納に隠れる',6.65,2.55, -Math.PI/2, '床下');
+  if (!state.questFlags.oldWingDeepKeyFound) {
+    const keyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.08,0.18), materials.brass);
+    keyMesh.position.y = 0.08;
+    addItem('oldWingDeepKey','錆びた鍵',6.2,-5.2,keyMesh,itemInteract);
+  }
+  const innerDoor = new THREE.Mesh(new THREE.BoxGeometry(2.0,2.5,0.18), new THREE.MeshStandardMaterial({ color:0x21171a, roughness:0.9, metalness:0.2 }));
+  innerDoor.position.set(0,1.25,-8.96); areaGroup.add(innerDoor);
+  addItem('oldWingInnerDoor','旧館奥の扉',0,-8.3,new THREE.Mesh(new THREE.BoxGeometry(1.6,0.1,0.9), new THREE.MeshBasicMaterial({transparent:true, opacity:0.01})), itemInteract);
+  addDoor('oldWingToOldHall','渡り廊下へ戻る',0,8.72,1.3,'oldhall',{x:0,z:-12.9,yaw:0},null,0x5b5961);
+}
+
+function addHideSpot(id,label,x,z,ry,display){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.25,1.75,0.34), new THREE.MeshStandardMaterial({color:0x2b211a, roughness:0.95}));
+  body.position.y = 0.88;
+  const face = makeTextPlane(display,0.72,0.22,{fg:'#ebdfca',bg:'rgba(0,0,0,.34)',fontSize:72});
+  face.position.set(0,1.75,0.19);
+  g.add(body, face);
+  g.position.set(x,0,z); g.rotation.y = ry || 0;
+  g.traverse(m=>{ if(m.isMesh){ m.castShadow=true; m.receiveShadow=true; } });
+  addItem(id,label,x,z,g,itemInteract);
+  addBoxCollider(x,z,1.05,0.36);
+}
+
 function buildArchive(){
   createFloor(18, 14, materials.tile, -0.1);
   createCeiling(18, 14, 0xd6d3cf);
@@ -3182,9 +3300,18 @@ function itemInteract(entity){
     });
   } else if (entity.id === 'endingFollow' && state.step === 'choose_fate') {
     showDialogue(storyNodes.ending_replace, () => {
-      setStep('ending_replace');
-      finishEnding('replace');
+      askReplaceEndingChoice();
     });
+  } else if (entity.id === 'oldWingDeepKey' && state.step === 'oldwing_search_key') {
+    playSfx('metal_rattle');
+    state.questFlags.oldWingDeepKeyFound = true;
+    state.questFlags.oldWingRandomChaseArmed = false;
+    showDialogue(storyNodes.oldWingFoundKey, () => setStep('oldwing_key_obtained'));
+  } else if (entity.id === 'oldWingInnerDoor' && state.step === 'oldwing_key_obtained') {
+    playSfx('metal_rattle');
+    showDialogue(storyNodes.oldWingInnerDoor, () => { saveToSlot(1, true); });
+  } else if ((entity.id === 'hideCloset1' || entity.id === 'hideShelf1' || entity.id === 'hideFloor1') && state.area === 'oldwing') {
+    hideFromOldWingChase(entity.id);
   } else if (entity.id === 'altar' && state.step === 'inspect_detached') {
     playSfx('metal_rattle');
     showDialogue(storyNodes.altar, () => {
@@ -3241,6 +3368,109 @@ function makePortrait(face){
 }
 dialogueOverlay.addEventListener('pointerdown', advanceDialogue);
 dialogueOverlay.addEventListener('touchstart', function(e){ e.preventDefault(); advanceDialogue(); }, { passive:false });
+
+
+function showChoiceOverlay(title, choices){
+  unlockAudio();
+  state.menuOpen = true;
+  resetInput();
+  let overlay = document.getElementById('choice-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'choice-overlay';
+    overlay.className = 'overlay choice-overlay hidden';
+    overlay.innerHTML = '<div class="menu-card choice-card"><h2></h2><div class="choice-list"></div></div>';
+    document.getElementById('game-root').appendChild(overlay);
+  }
+  const h = overlay.querySelector('h2');
+  const list = overlay.querySelector('.choice-list');
+  h.textContent = title || '選択';
+  list.innerHTML = '';
+  (choices || []).forEach(ch => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = ch.label;
+    btn.addEventListener('click', () => {
+      playSfx('ui_tap');
+      overlay.classList.add('hidden');
+      state.menuOpen = false;
+      if (typeof ch.action === 'function') ch.action();
+    }, { once: true });
+    list.appendChild(btn);
+  });
+  overlay.classList.remove('hidden');
+}
+
+function askReplaceEndingChoice(){
+  showChoiceOverlay('誘導員の役目を引き継ぎますか？', [
+    { label: 'はい', action: () => showDialogue(storyNodes.replaceEndingMovieIntro, startReplaceEndingMovie) },
+    { label: 'いいえ', action: () => beginOldWingDeepRoute() }
+  ]);
+}
+
+function beginOldWingDeepRoute(){
+  state.questFlags.oldWingDeepRouteStarted = true;
+  state.questFlags.oldWingRandomChaseArmed = true;
+  showDialogue(storyNodes.refuseReplaceRoute, () => {
+    playSfx('door_open');
+    state.area = 'oldwing';
+    buildArea(state.area);
+    player.x = 0;
+    player.z = 6.2;
+    player.yaw = Math.PI;
+    player.pitch = -0.05;
+    resetInput();
+    state.inputLockUntil = performance.now() + 700;
+    state.doorCooldownUntil = performance.now() + 900;
+    setStep('oldwing_search_key');
+    showDialogue(storyNodes.oldWingDeepStart, () => { saveToSlot(1, true); });
+  });
+}
+
+function startReplaceEndingMovie(){
+  state.questFlags.replaceEndingMovieSeen = true;
+  state.area = 'archive';
+  buildArea(state.area);
+  stopChase();
+  player.x = 0.2; player.z = 5.2; player.yaw = Math.PI; player.pitch = -0.02;
+  resetInput();
+  const guest = makeCharacter('yukata');
+  guest.position.set(-0.25, 0, -4.7);
+  dynamicGroup.add(guest);
+  const hero = makeCharacter('casual');
+  hero.position.set(0.25, 0, 2.4);
+  dynamicGroup.add(hero);
+  const guestEnt = { group: guest, rot: Math.PI };
+  const heroEnt = { group: hero, rot: Math.PI };
+  playSfx('distant_step');
+  startCutscene([
+    { duration: 0.55, onStart(){ playSfx('scare_sting'); }, onUpdate(t){ player.yaw = lerpAngle(player.yaw, Math.PI, easeInOut(t)); player.pitch = lerp(player.pitch, -0.03, t); } },
+    { duration: 2.2, onUpdate(t){
+        const e = easeInOut(t);
+        guest.position.z = lerp(-4.7, -6.1, e);
+        guest.position.x = -0.25 + Math.sin(e * Math.PI * 5) * 0.12;
+        hero.position.z = lerp(2.4, -4.2, e);
+        hero.position.x = 0.25 + Math.sin(e * Math.PI * 3) * 0.08;
+        guest.position.y = Math.sin(e * Math.PI * 10) * 0.025;
+        hero.position.y = Math.sin(e * Math.PI * 6) * 0.018;
+        guestEnt.rot = Math.PI; heroEnt.rot = Math.PI;
+        updateCharacterBillboard(guestEnt); updateCharacterBillboard(heroEnt);
+        const lookZ = lerp(-2.2, -5.6, e);
+        player.yaw = lerpAngle(player.yaw, lookYawToPoint(0, lookZ), 0.08);
+      } },
+    { duration: 0.35, onStart(){ playSfx('stall_slam'); }, onUpdate(t){ player.pitch = -0.02 + Math.sin(t * Math.PI * 9) * 0.012; } },
+    { duration: 0.9, onStart(){ playSfx('paper'); }, onUpdate(t){ player.pitch = lerp(player.pitch, -0.09, t); } },
+    { duration: 0.45, onStart(){ playSfx('note_pickup'); }, onEnd(){ dynamicGroup.remove(guest); dynamicGroup.remove(hero); } }
+  ], () => {
+    state.area = 'lobby';
+    buildArea(state.area);
+    player.x = 0; player.z = -4.6; player.yaw = 0; player.pitch = -0.05;
+    showDialogue(storyNodes.replaceEndingMovieAfter, () => {
+      setStep('ending_replace');
+      finishEnding('replace');
+    });
+  });
+}
 
 function applyEndingScreen(type){
   if (!endingTitleEl || !endingTextEl) return;
@@ -3301,6 +3531,59 @@ function getChaseCheckpoint(areaId, linkedStep){
     return { area: 'detached', x: 2.4, z: -1.2, yaw: Math.PI * 0.18, step: linkedStep, guideSpawn: { x: 7.2, z: 1.2 } };
   }
   return { area: areaId, x: player.x, z: player.z, yaw: player.yaw, step: linkedStep, guideSpawn: { x: 0, z: 0 } };
+}
+
+
+function startTimedOldWingChase(origin){
+  if (state.chase || state.area !== 'oldwing' || state.step !== 'oldwing_search_key') return;
+  playSfx('chase_start');
+  const spawnCandidates = [
+    {x:-7.0,z:6.4}, {x:7.0,z:5.8}, {x:-7.3,z:-6.8}, {x:7.2,z:-1.8}, {x:0.0,z:7.4}
+  ];
+  const far = spawnCandidates
+    .map(p => ({...p, d: Math.hypot(player.x-p.x, player.z-p.z)}))
+    .filter(p => p.d > 4.0)
+    .sort((a,b)=>b.d-a.d)[0] || spawnCandidates[0];
+  const safeGuide = findNearestOpenPoint(far.x, far.z, 0.3, player.x, player.z);
+  state.checkpoint = { area:'oldwing', x:player.x, z:player.z, yaw:player.yaw, step:'oldwing_search_key', guideSpawn:safeGuide };
+  state.chase = { active:true, speed:2.45, graceUntil: performance.now()+1700, until: performance.now()+10000, mode:'oldwing_random' };
+  spawnGuide(safeGuide.x, safeGuide.z);
+  refreshAmbience(true);
+}
+
+function hideFromOldWingChase(id){
+  if (state.area !== 'oldwing') return;
+  if (!state.chase || state.chase.mode !== 'oldwing_random') {
+    showDialogue([['主人公','ここなら、何かから逃げる時に身を隠せそうだ。','hero']], ()=>{});
+    return;
+  }
+  const dist = state.guide ? Math.hypot(player.x - state.guide.group.position.x, player.z - state.guide.group.position.z) : 99;
+  if (dist < 1.8) {
+    playSfx('scare_sting');
+    showDialogue([['主人公','近すぎる。今入ったら、見つかる。','hero']], ()=>{});
+    return;
+  }
+  resetInput();
+  state.inputLockUntil = performance.now()+6800;
+  playSfx('door_open');
+  startCutscene([
+    {duration:0.35,onUpdate(t){ player.pitch = lerp(player.pitch, -0.18, t); }},
+    {duration:4.8,onStart(){ playSfx('distant_step'); },onUpdate(t){ if(state.guide){ const dx=state.guide.group.position.x-player.x, dz=state.guide.group.position.z-player.z; player.yaw = lerpAngle(player.yaw, Math.atan2(-dx,-dz), 0.03); } }},
+    {duration:0.35,onStart(){ playSfx('paper'); }}
+  ],()=>{
+    stopChase();
+    showDialogue(storyNodes.hideSuccess, ()=>{});
+  });
+}
+
+function updateOldWingRandomChase(now){
+  if (state.area !== 'oldwing' || state.step !== 'oldwing_search_key' || state.menuOpen || state.cutscene || state.chase) return;
+  if (!state.questFlags.oldWingRandomChaseArmed || state.questFlags.oldWingDeepKeyFound) return;
+  state.questFlags._oldWingNextChaseAt ??= now + 14000 + Math.random()*12000;
+  if (now > state.questFlags._oldWingNextChaseAt) {
+    state.questFlags._oldWingNextChaseAt = now + 30000 + Math.random()*24000;
+    startTimedOldWingChase('random');
+  }
 }
 
 function startChase(areaId, guidePos, linkedStep){
@@ -3448,6 +3731,12 @@ function retryFromCheckpoint(){
     const safeGs = findNearestOpenPoint(gs.x, gs.z, 0.3, player.x, player.z);
     spawnGuide(safeGs.x, safeGs.z);
   }
+  if (state.step === 'oldwing_search_key') {
+    state.chase = { active: true, speed: 2.45, graceUntil: performance.now() + 1800, until: performance.now() + 10000, mode:'oldwing_random' };
+    const gs = state.checkpoint.guideSpawn || {x:7.0,z:5.8};
+    const safeGs = findNearestOpenPoint(gs.x, gs.z, 0.3, player.x, player.z);
+    spawnGuide(safeGs.x, safeGs.z);
+  }
 }
 
 function getLiveEntityForTrigger(trigger){
@@ -3539,7 +3828,7 @@ function getNearestInteractable(){
     const dist = Math.hypot(dx, dz);
     const isCurrentTarget = !!(trigger && trigger.type === obj.type && trigger.id === obj.entity.id);
     const id = obj.entity && obj.entity.id;
-    const largePromptIds = new Set(['posterBoard','futonBed','scheduleNote','amenityBag','amenityBox','slipperRack','towelShelf','phone','registerBook','sealTag','altar','bathNotice','fireMap','blueLedger','blueLedger2','toiletStallDoor','phantom203','oldWingDoorLock','oldHallEndDoor']);
+    const largePromptIds = new Set(['posterBoard','futonBed','scheduleNote','amenityBag','amenityBox','slipperRack','towelShelf','phone','registerBook','sealTag','altar','bathNotice','fireMap','blueLedger','blueLedger2','toiletStallDoor','phantom203','oldWingDoorLock','oldHallEndDoor','oldWingDeepKey','oldWingInnerDoor','hideCloset1','hideShelf1','hideFloor1']);
     const bonusDist = largePromptIds.has(id) ? 1.8 : 0;
     const maxDist = obj.type === 'door' ? 3.1 : (isCurrentTarget ? 6.0 + bonusDist : 2.8 + bonusDist * 0.4);
     if (dist > maxDist) continue;
@@ -3670,7 +3959,7 @@ function updateMinimap(){
   roundRect(minimapCtx, 0,0,minimap.width,minimap.height,22); minimapCtx.fill();
   minimapCtx.fillStyle = '#a79b84'; minimapCtx.font = '12px sans-serif'; minimapCtx.fillText('館内導線', 14, 18);
   const nodes = {
-    home:[18,30], town:[60,30], lobby:[104,30], kitchen:[104,72], corridor:[156,30], room201:[204,12], room202:[204,48], bath:[252,14], archive:[156,72], north:[204,86], detached:[252,72], oldhall:[298,72]
+    home:[18,30], town:[60,30], lobby:[104,30], kitchen:[104,72], corridor:[156,30], room201:[204,12], room202:[204,48], bath:[252,14], archive:[156,72], north:[204,86], detached:[252,72], oldhall:[298,72], oldwing:[298,116]
   };
   minimapCtx.strokeStyle='rgba(255,255,255,.14)'; minimapCtx.lineWidth=2;
   Object.keys(graph).forEach(k=>{ Object.keys(graph[k]).forEach(to=>{ if(k<to){ const a=nodes[k], b=nodes[to]; if(!a || !b) return; minimapCtx.beginPath(); minimapCtx.moveTo(a[0],a[1]); minimapCtx.lineTo(b[0],b[1]); minimapCtx.stroke(); } }); });
@@ -3748,6 +4037,10 @@ function attemptEntityMove(entity, nx, nz, radius=0.32){
 
 function updateChase(dt){
   if (!state.chase || !state.guide || state.menuOpen || !dialogueOverlay.classList.contains('hidden')) return;
+  if (state.chase.until && performance.now() > state.chase.until) {
+    stopChase();
+    return;
+  }
   const gx = state.guide.group.position.x, gz = state.guide.group.position.z;
   const dx = player.x - gx, dz = player.z - gz;
   const dist = Math.hypot(dx,dz);
@@ -3811,6 +4104,7 @@ function update(){
   maybeStartArchiveGuideGlimpse();
   maybeStartDay3GuideTease();
   updateOldHallScares();
+  updateOldWingRandomChase(performance.now());
   if (state.hudHidden) {
     hud.style.display = 'none';
     joystickZone.style.display = 'none';

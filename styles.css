@@ -106,3 +106,12 @@ body{overscroll-behavior:none;}
 .slot-btn span{font-size:14px; color:#d5c7b3;}
 .slot-btn:disabled{opacity:.48;}
 .title-slot-overlay{z-index:6;}
+.choice-card{max-width:520px;text-align:center;}
+.choice-list{display:grid;gap:12px;margin-top:18px;}
+.choice-btn{font-size:20px;padding:16px 18px;border-radius:16px;border:1px solid rgba(255,255,255,.18);background:linear-gradient(180deg,rgba(70,44,34,.96),rgba(25,18,16,.96));color:#f4eadc;font-weight:800;letter-spacing:.08em;}
+.choice-btn:active{transform:scale(.98);}
+
+.choice-card{max-width:520px;text-align:center;}
+.choice-list{display:grid;gap:12px;margin-top:18px;}
+.choice-btn{font-size:20px;padding:16px 18px;border-radius:16px;border:1px solid rgba(255,255,255,.18);background:linear-gradient(180deg,rgba(70,44,34,.96),rgba(25,18,16,.96));color:#f4eadc;font-weight:800;letter-spacing:.08em;}
+.choice-btn:active{transform:scale(.98);}

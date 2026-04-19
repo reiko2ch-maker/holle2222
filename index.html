@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>宵宿 B35 Old Wing Corruption Pass</title>
-  <link rel="stylesheet" href="styles.css?v=b36_oldwing_force_corruption_fix">
+  <title>宵宿 B37 Replace Ending Movie + Old Wing Route</title>
+  <link rel="stylesheet" href="styles.css?v=b37_replace_oldwing_route">
 </head>
 <body class="title-body">
   <div class="crt"></div>
@@ -26,7 +26,7 @@
         <button class="sub-btn" id="wipe-save">全スロット削除</button>
       </div>
       <p class="hint">PC: WASD / Shift / マウスドラッグ / E / ESC<br>スマホ: 左スティック移動 / 右半分ドラッグ視点 / RUN / ACT</p>
-      <p class="version">B21 Cutscene + Poster + Door Readability Fix</p>
+      <p class="version">B37 Replace Ending Movie + Old Wing Route</p>
     </div>
   </main>
 
@@ -51,7 +51,7 @@
       function slotKey(n){ return SAVE_PREFIX + n; }
       function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
       function renderSlots(){
-        const labels = { start_note:'机へ', leave_home:'玄関へ', walk_to_ryokan:'旅館入口へ', talk_okami:'女将へ', get_tray:'厨房へ', deliver_201:'201号室へ', report_okami:'帳場へ戻る', stock_amenities:'戸棚へ', place_amenities:'備品箱へ', arrange_slippers:'下駄箱前へ', restock_towels:'浴場前へ', answer_phone:'浴場前へ', inspect_archive:'宿帳庫へ', escape_archive:'帳場へ逃げる', sleep_day1:'布団へ', leave_home_day2:'玄関へ', commute_day2:'旅館入口へ', talk_maid:'仲居へ', inspect_north:'北廊下へ', inspect_detached:'離れ通路へ', escape_detached:'帳場へ逃げる', finale:'女将へ', sleep_day2:'布団へ', leave_home_day3:'玄関へ', inspect_poster_day3:'掲示板へ', commute_day3:'旅館入口へ', talk_okami_day3:'女将へ', inspect_guestbook_203:'宿帳へ', talk_toilet_guest_day3:'個室の客へ', inspect_bath_notice:'清掃案内へ', inspect_fire_map:'避難図へ', read_blue_note_2:'青いノートへ', guide_tease_day3:'客室廊下へ', enter_203_phantom:'203の痕跡へ', final_choice:'帳場へ', choose_fate:'番台へ', ending_return:'帰還', ending_guest:'宿泊', ending_replace:'交代' };
+        const labels = { start_note:'机へ', leave_home:'玄関へ', walk_to_ryokan:'旅館入口へ', talk_okami:'女将へ', get_tray:'厨房へ', deliver_201:'201号室へ', report_okami:'帳場へ戻る', stock_amenities:'戸棚へ', place_amenities:'備品箱へ', arrange_slippers:'下駄箱前へ', restock_towels:'浴場前へ', answer_phone:'浴場前へ', inspect_archive:'宿帳庫へ', escape_archive:'帳場へ逃げる', sleep_day1:'布団へ', leave_home_day2:'玄関へ', commute_day2:'旅館入口へ', talk_maid:'仲居へ', inspect_north:'北廊下へ', inspect_detached:'離れ通路へ', escape_detached:'帳場へ逃げる', finale:'女将へ', sleep_day2:'布団へ', leave_home_day3:'玄関へ', inspect_poster_day3:'掲示板へ', commute_day3:'旅館入口へ', talk_okami_day3:'女将へ', inspect_guestbook_203:'宿帳へ', talk_toilet_guest_day3:'個室の客へ', inspect_bath_notice:'清掃案内へ', inspect_fire_map:'避難図へ', read_blue_note_2:'青いノートへ', guide_tease_day3:'客室廊下へ', enter_203_phantom:'203の痕跡へ', final_choice:'帳場へ', choose_fate:'番台へ', ending_return:'帰還', ending_guest:'宿泊', ending_replace:'交代', oldwing_search_key:'旧館で鍵を探す', oldwing_key_obtained:'旧館奥へ' };
         list.innerHTML = '';
         for (let i=1;i<=3;i++){
           const raw = localStorage.getItem(slotKey(i));
