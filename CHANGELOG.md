@@ -1,3 +1,10 @@
+
+## B43 - Minigame real fix
+- Fixed 10-stage minigame crash caused by object stage definitions being treated as arrays.
+- Added robust stage parser for object/array map formats.
+- Added safe fallback so the minigame does not freeze on malformed stage data.
+- Updated cache-busting version to b43_minigame_real_fix.
+
 ## B41 Special Route / 10 Stage Mini Game
 - ミニゲームを10ステージ制に拡張。鍵、扉、巡回敵、罠床、視界制限、速度上昇など段階的に難しくなるギミックを追加。
 - ミニゲーム内に「戻る」ボタンを追加。途中で中断して本編へ戻れるように調整。

@@ -3876,15 +3876,24 @@ function startDotMiniGame(){
   ];
   let stageIndex = 0, grid, px, py, startX, startY, hasKey, enemies, movingLocked = false;
   function parseStage(){
-    const raw = stages[stageIndex].map(r => r.split(''));
-    grid = raw; enemies = []; hasKey = false;
+    const stage = stages[stageIndex] || stages[0];
+    const source = Array.isArray(stage) ? stage : (Array.isArray(stage.map) ? stage.map : []);
+    if (!source.length) {
+      console.warn('minigame stage map missing', stageIndex, stage);
+      grid = [['P','.','.','G']];
+    } else {
+      grid = source.map(r => String(r).split(''));
+    }
+    enemies = []; hasKey = false;
+    px = py = startX = startY = undefined;
     for(let y=0;y<grid.length;y++) for(let x=0;x<grid[y].length;x++){
       const c = grid[y][x];
       if(c==='P'){ px=x; py=y; startX=x; startY=y; grid[y][x]='.'; }
       if(c==='E'){ enemies.push({x,y,dx:(stageIndex%2?1:0),dy:(stageIndex%2?0:1)}); grid[y][x]='.'; }
     }
+    if (typeof px !== 'number' || typeof py !== 'number') { px = 1; py = 1; startX = 1; startY = 1; }
     title.textContent = '旧館迷路 ' + (stageIndex+1) + '/10';
-    help.textContent = stages[stageIndex].note;
+    help.textContent = (Array.isArray(stage) ? '' : stage.note) || 'ゴールへ進め。';
     status.textContent = 'STAGE ' + (stageIndex+1) + ' / 10';
     movingLocked = false;
     draw();
@@ -3924,7 +3933,8 @@ function startDotMiniGame(){
     return false;
   }
   function moveEnemies(){
-    const steps = stages[stageIndex].fast ? 2 : 1;
+    const curStageForEnemy = stages[stageIndex] || {};
+    const steps = (!Array.isArray(curStageForEnemy) && curStageForEnemy.fast) ? 2 : 1;
     for(let k=0;k<steps;k++){
       for(const e of enemies){
         let nx=e.x+e.dx, ny=e.y+e.dy;
@@ -3951,7 +3961,8 @@ function startDotMiniGame(){
   function draw(){
     ctx.fillStyle = '#0b0f17'; ctx.fillRect(0,0,canvas.width,canvas.height);
     for(let y=0;y<grid.length;y++) for(let x=0;x<grid[y].length;x++){
-      if(stages[stageIndex].dark && Math.abs(x-px)+Math.abs(y-py)>4) { ctx.fillStyle='#050609'; ctx.fillRect(x*tile,y*tile,tile,tile); continue; }
+      const curStageForDraw = stages[stageIndex] || {};
+      if((!Array.isArray(curStageForDraw) && curStageForDraw.dark) && Math.abs(x-px)+Math.abs(y-py)>4) { ctx.fillStyle='#050609'; ctx.fillRect(x*tile,y*tile,tile,tile); continue; }
       const c=grid[y][x];
       ctx.fillStyle = c==='#' ? '#3b2f24' : '#1c2832'; ctx.fillRect(x*tile,y*tile,tile,tile);
       if(c==='#'){ ctx.fillStyle='#5c4735'; ctx.fillRect(x*tile+3,y*tile+3,tile-6,tile-6); }
