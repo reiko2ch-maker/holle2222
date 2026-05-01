@@ -507,6 +507,15 @@ function ensureQuestFlagDefaults(flags){
   q.rareWhiteMet ??= false;
   q.hasMiniRouteKey ??= false;
   q.miniGameCleared ??= false;
+  q.miniGameStageCleared ??= 0;
+  q.coinLockerOpened ??= false;
+  q.backyardRouteUnlocked ??= false;
+  q.hasFlashlight ??= false;
+  q.hasOldWingMapFragment ??= false;
+  q.hasRoom203Tag ??= false;
+  q.backyardWindowSeen ??= false;
+  q.backyardShrineNoiseHeard ??= false;
+  q.backyardRouteCompleted ??= false;
   return q;
 }
 
@@ -518,8 +527,9 @@ const areaAnchors = {};
 let interactionMarker = null;
 const graph = {
   home: { town: 12 },
-  town: { home: 12, lobby: 18 },
+  town: { home: 12, lobby: 18, backyard: 10 },
   lobby: { town: 18, corridor: 12, kitchen: 8, archive: 9, oldhall: 8 },
+  backyard: { town: 10 },
   kitchen: { lobby: 8 },
   corridor: { lobby: 12, room201: 6, room202: 7, bath: 12, north: 13 },
   room201: { corridor: 6 },
@@ -533,7 +543,7 @@ const graph = {
 };
 
 const areaLabels = {
-  home: '自宅', town: '田舎町', lobby: '帳場', kitchen: '厨房', corridor: '客室廊下', room201: '201号室', room202: '202号室', bath: '浴場前', archive: '宿帳庫', north: '北廊下', detached: '離れ通路', oldhall: '旧館渡り廊下', oldwing: '旧館深部'
+  home: '自宅', town: '田舎町', backyard: '旅館裏庭', lobby: '帳場', kitchen: '厨房', corridor: '客室廊下', room201: '201号室', room202: '202号室', bath: '浴場前', archive: '宿帳庫', north: '北廊下', detached: '離れ通路', oldhall: '旧館渡り廊下', oldwing: '旧館深部'
 };
 
 const stepDefs = {
@@ -601,6 +611,8 @@ graph.corridor.north = 18;
 graph.north.corridor = 18;
 graph.lobby.town = 18;
 graph.town.lobby = 18;
+graph.town.backyard = 10;
+graph.backyard = { town: 10 };
 graph.north.detached = 10;
 graph.detached.north = 10;
 graph.archive.detached = 16;
@@ -1074,6 +1086,11 @@ const fallbackLabels = {
   hideShelf1: '倒れた棚',
   hideFloor1: '床下収納',
   arcadeMiniGame: '古い携帯ゲーム',
+  coinLocker: '古いロッカー',
+  backyardShrine: '小さな祠',
+  backyardWindow: '旧館の窓',
+  backyard203Tag: '焦げた部屋札',
+  backyardLockedGate: '裏庭の通用口',
   rareRedGuest: '赤パーカーの客',
   rareWhiteGuest: '白パーカーの客'
 };
@@ -2135,20 +2152,50 @@ function maybeStartDay3GuideTease(){
 }
 
 storyNodes.rareRedGuest = [
-  ['赤パーカーの客','……あれ？こんな夜に散歩？ 変な場所に迷い込まない方がいいよ。','rare_red'],
-  ['主人公','妙に明るい。けれど、少し目を離したらもういなくなっていそうだ。','hero']
+  ['赤パーカーの客','……あれ？古い携帯ゲーム、見た？ あれさ、クリアするたびに旅館の形が変わるんだよね。','rare_red'],
+  ['赤パーカーの客','10個目の迷路まで行けたら、コンビニ裏の古いロッカーを見てみなよ。','rare_red'],
+  ['主人公','冗談みたいに明るい。けれど、話の中身だけが妙に具体的だった。','hero']
 ];
 storyNodes.rareWhiteGuest = [
-  ['白パーカーの客','ここ、道がつながってるようで、つながってないんだよ。戻るなら今だよ。','rare_white'],
-  ['主人公','冗談のような口調なのに、目だけが笑っていなかった。','hero']
+  ['白パーカーの客','鍵ってさ、開けるためだけにあるとは限らないよ。閉じてたものを、こっち側に呼ぶこともある。','rare_white'],
+  ['白パーカーの客','裏庭の窓は、見たら覚えておいた方がいい。後で、必ず同じ場所を見ることになるから。','rare_white'],
+  ['主人公','笑っているようで、声だけが冷たかった。','hero']
 ];
 storyNodes.arcadeMiniGameIntro = [
   ['主人公','古い携帯ゲーム機が落ちている。画面には小さな迷路が映っている。','hero'],
   ['主人公','ゴールまで行けば、何かが開く……そんな文字が残っている。','hero']
 ];
 storyNodes.arcadeMiniGameClear = [
-  ['主人公','ミニゲームをクリアした。内部の小さな蓋が開く音がした。','hero'],
-  ['主人公','小さな銀鍵を手に入れた。序盤の特殊ルートに使えそうだ。','hero']
+  ['主人公','10個目の迷路を抜けた瞬間、古い携帯ゲーム機の内部で小さな蓋が開いた。','hero'],
+  ['主人公','小さな銀鍵を手に入れた。近くの古いロッカーに使えそうだ。','hero']
+];
+storyNodes.arcadeMiniGameQuit = [
+  ['主人公','ゲーム機の電源を切った。続きはまた挑戦できそうだ。','hero']
+];
+storyNodes.coinLockerOpen = [
+  ['主人公','小さな銀鍵で、古いコインロッカーが開いた。','hero'],
+  ['主人公','中には従業員メモ、旧館の見取り図の切れ端、弱い懐中電灯が入っていた。','hero'],
+  ['メモ','「裏庭の通用口は使うな。旧館側の窓を見てはいけない。あそこは、まだ閉じていない」','hero']
+];
+storyNodes.coinLockerLocked = [
+  ['主人公','古いコインロッカーだ。小さな銀色の鍵穴がある。','hero'],
+  ['主人公','今は開けられない。','hero']
+];
+storyNodes.backyardShrine = [
+  ['主人公','小さな祠だ。置かれた鈴は錆びている。','hero'],
+  ['主人公','触れた瞬間、さっきのミニゲームと同じ電子音が一瞬だけ鳴った。','hero']
+];
+storyNodes.backyardWindow = [
+  ['主人公','旧館の窓が、庭の向こうに見える。','hero'],
+  ['主人公','何もいないはずなのに、内側から誰かがこちらを見ていた気がした。','hero']
+];
+storyNodes.backyard203Tag = [
+  ['主人公','草むらの中に、焦げた部屋札が落ちている。','hero'],
+  ['主人公','「203」……この旅館にないはずの部屋番号だ。','hero']
+];
+storyNodes.backyardLockedGate = [
+  ['主人公','裏庭の通用口には鍵穴がある。けれど、この鍵では開かない。','hero'],
+  ['主人公','中から、誰かが鍵をかけている。','hero']
 ];
 
 
@@ -2167,6 +2214,7 @@ function buildArea(areaId){
   scene.fog.near = 16; scene.fog.far = 42;
   if (areaId === 'home') buildHome();
   else if (areaId === 'town') buildTown();
+  else if (areaId === 'backyard') buildBackyard();
   else if (areaId === 'lobby') buildLobby();
   else if (areaId === 'kitchen') buildKitchen();
   else if (areaId === 'corridor') buildCorridor();
@@ -2415,10 +2463,107 @@ function buildTown(){
     addFloorShadow(-5.65,-2.9,1.0,0.8,0.12);
   }
 
+  // Special mini-game route: silver key -> coin locker -> backyard omen route.
+  const locker = new THREE.Group();
+  const lockerBody = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.85, 0.42), new THREE.MeshStandardMaterial({ color: 0x6e7b86, roughness: 0.88, metalness: 0.18 }));
+  lockerBody.position.y = 0.92; locker.add(lockerBody);
+  for(let i=0;i<3;i++){
+    const seam = new THREE.Mesh(new THREE.BoxGeometry(0.92,0.03,0.03), materials.black);
+    seam.position.set(0,0.55+i*0.45,0.225); locker.add(seam);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035,10,10), materials.brass);
+    knob.position.set(0.33,0.72+i*0.45,0.25); locker.add(knob);
+  }
+  const lockerLabel = makeTextPlane('古いロッカー', 0.78, 0.18, { fg:'#f1eadc', bg:'rgba(0,0,0,.42)', fontSize:70 });
+  lockerLabel.position.set(0,1.98,0.25); locker.add(lockerLabel);
+  addItem('coinLocker','古いロッカー',-3.6,-3.15,locker,itemInteract);
+  addFloorShadow(-3.6,-3.15,1.3,1.0,0.14);
+
+  if (state.questFlags.backyardRouteUnlocked) {
+    const pathSign = makeTextPlane('裏路地', 0.9, 0.24, { fg:'#f4ead0', bg:'rgba(20,12,6,.58)', fontSize:78 });
+    pathSign.position.set(5.8,1.1,6.9); pathSign.rotation.y = Math.PI; areaGroup.add(pathSign);
+    const alley = new THREE.Mesh(new THREE.BoxGeometry(3.0,0.04,1.2), new THREE.MeshStandardMaterial({ color:0x82715e, roughness:1 }));
+    alley.position.set(5.8,-0.035,6.45); alley.receiveShadow=true; areaGroup.add(alley);
+    addDoor('townToBackyard','裏路地',5.8,6.35,1.65,'backyard',{x:0,z:7.2,yaw:Math.PI},'z',0x786857,{style:'door'});
+  }
+
   // Rare cameo characters. They are placed away from the main route so they feel like discoveries, not blockers.
   addNPC('rareRedGuest','赤パーカーの客','rare_red','rare_red',-6.8,6.0,Math.PI*0.7,npcInteract);
 }
 
+
+
+function buildBackyard(){
+  scene.background = new THREE.Color(0x111821);
+  scene.fog.color.set(0x111821);
+  scene.fog.near = 14; scene.fog.far = 36;
+  hemi.intensity = 0.55;
+  dirLight.intensity = 0.38;
+  dirLight.position.set(-5, 8, 5);
+  createFloor(18, 16, new THREE.MeshStandardMaterial({ color: 0x2c3d2f, roughness: 1 }), -0.1);
+  // enclosing walls / hedges
+  wallSegment(0,-7.9,18,2.2,0.18,materials.darkWood);
+  wallSegment(0,7.9,18,2.2,0.18,materials.darkWood);
+  wallSegment(-8.9,0,0.18,2.2,16,materials.darkWood);
+  wallSegment(8.9,0,0.18,2.2,16,materials.darkWood);
+  addCollider(-8.9,-7.9,8.9,-7.65); addCollider(-8.9,7.65,8.9,7.9); addCollider(-8.9,-7.9,-8.65,7.9); addCollider(8.65,-7.9,8.9,7.9);
+
+  const pathMat = new THREE.MeshStandardMaterial({ color: 0x7e7366, roughness: 1 });
+  const path = new THREE.Mesh(new THREE.BoxGeometry(2.0,0.04,14.4), pathMat);
+  path.position.set(0,-0.06,0); path.receiveShadow=true; areaGroup.add(path);
+  const sidePath = new THREE.Mesh(new THREE.BoxGeometry(8.6,0.04,1.2), pathMat);
+  sidePath.position.set(2.5,-0.055,-3.8); sidePath.receiveShadow=true; areaGroup.add(sidePath);
+
+  // water channel
+  const water = new THREE.Mesh(new THREE.BoxGeometry(1.0,0.03,13.4), new THREE.MeshStandardMaterial({ color: 0x1f3442, roughness: 0.35, metalness: 0.05, emissive: 0x07111a, emissiveIntensity: 0.18 }));
+  water.position.set(-5.8,-0.07,0); areaGroup.add(water);
+  const channelL = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.18,13.5), new THREE.MeshStandardMaterial({ color: 0x787167, roughness: 1 }));
+  channelL.position.set(-6.38,0.02,0); areaGroup.add(channelL);
+  const channelR = channelL.clone(); channelR.position.x = -5.22; areaGroup.add(channelR);
+  addBoxCollider(-6.38,0,0.2,13.5); addBoxCollider(-5.22,0,0.2,13.5);
+
+  for (const [x,z,s] of [[-7,5,0.8],[-7,-4.2,0.7],[6.8,4.5,0.9],[7,-2.8,0.75]]) addTree(x,z,s);
+  addAndonLamp(-2.2,4.2,0.75);
+  addAndonLamp(3.8,-3.6,0.7);
+  addLamp(0, 2.2, 0.16, 0xffd7a0);
+
+  // old wing window view beyond a fence
+  const oldWall = new THREE.Mesh(new THREE.BoxGeometry(5.2,2.6,0.2), new THREE.MeshStandardMaterial({ color:0x51483d, roughness:1 }));
+  oldWall.position.set(5.5,1.3,-6.9); oldWall.castShadow=oldWall.receiveShadow=true; areaGroup.add(oldWall);
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(2.2,1.15), new THREE.MeshBasicMaterial({ color:0x101319, transparent:true, opacity:0.78, side:THREE.DoubleSide }));
+  win.position.set(5.5,1.55,-6.78); areaGroup.add(win);
+  const winFrameH = new THREE.Mesh(new THREE.BoxGeometry(2.5,0.08,0.12), materials.darkWood);
+  winFrameH.position.set(5.5,1.55,-6.72); areaGroup.add(winFrameH);
+  const winFrameV = new THREE.Mesh(new THREE.BoxGeometry(0.08,1.3,0.12), materials.darkWood);
+  winFrameV.position.set(5.5,1.55,-6.7); areaGroup.add(winFrameV);
+  const windowHit = new THREE.Mesh(new THREE.BoxGeometry(2.8,1.4,1.2), new THREE.MeshBasicMaterial({transparent:true, opacity:0.01}));
+  windowHit.position.y = 1.1;
+  addItem('backyardWindow','旧館の窓',5.5,-6.45,windowHit,itemInteract);
+
+  // shrine
+  const shrine = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.0,0.18,0.8), new THREE.MeshStandardMaterial({ color: 0x787167, roughness: 1 })); base.position.y=0.09; shrine.add(base);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.72,0.62,0.58), new THREE.MeshStandardMaterial({color:0x5f4432, roughness:1})); box.position.y=0.52; shrine.add(box);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(0.62,0.38,4), new THREE.MeshStandardMaterial({color:0x392a23, roughness:1})); roof.position.y=0.95; roof.rotation.y=Math.PI/4; shrine.add(roof);
+  addItem('backyardShrine','小さな祠',-3.2,4.6,shrine,itemInteract);
+
+  if (!state.questFlags.hasRoom203Tag) {
+    const tag = makeTextPlane('203',0.56,0.28,{fg:'#1b110c', bg:'rgba(219,202,160,.94)', fontSize:92});
+    tag.rotation.x = -Math.PI/2;
+    addItem('backyard203Tag','焦げた部屋札',-2.9,-3.85,tag,itemInteract);
+  }
+
+  const backGate = new THREE.Group();
+  const gp1 = new THREE.Mesh(new THREE.BoxGeometry(0.22,1.8,0.22),materials.darkWood); gp1.position.set(-0.7,0.9,0);
+  const gp2 = gp1.clone(); gp2.position.x=0.7;
+  const gt = new THREE.Mesh(new THREE.BoxGeometry(1.7,0.12,0.22),materials.darkWood); gt.position.set(0,1.72,0);
+  const bars = new THREE.Mesh(new THREE.BoxGeometry(1.35,1.2,0.06),new THREE.MeshStandardMaterial({color:0x22242a, roughness:.8, metalness:.25})); bars.position.set(0,0.82,0.05);
+  backGate.add(gp1,gp2,gt,bars);
+  addItem('backyardLockedGate','裏庭の通用口',3.8,-3.8,backGate,itemInteract);
+  addBoxCollider(3.8,-3.8,1.7,0.6);
+
+  addDoor('backyardToTown','田舎町へ戻る',0,7.3,1.55,'town',{x:5.8,z:5.65,yaw:0},'z',0x7a6b5b);
+  addNPC('rareWhiteGuest','白パーカーの客','rare_white','rare_white',-6.7,5.9,Math.PI*0.4,npcInteract);
+}
 
 
 function buildLobby(){
@@ -3283,10 +3428,41 @@ function itemInteract(entity){
   if (entity.id === 'arcadeMiniGame') {
     playSfx('ui_tap');
     if (state.questFlags.miniGameCleared) {
-      showDialogue([['主人公','古い携帯ゲーム機だ。画面には「CLEAR」の文字が残っている。','hero'], ['主人公','中から出てきた小さな銀鍵は、まだ持っている。','hero']], ()=>{});
+      showDialogue([['主人公','古い携帯ゲーム機だ。画面には「STAGE 10 CLEAR」の文字が残っている。','hero'], ['主人公','小さな銀鍵は、古いロッカーに使えそうだ。','hero']], ()=>{});
     } else {
       showDialogue(storyNodes.arcadeMiniGameIntro, () => startDotMiniGame());
     }
+  } else if (entity.id === 'coinLocker') {
+    playSfx('metal_rattle');
+    if (!state.questFlags.hasMiniRouteKey) {
+      showDialogue(storyNodes.coinLockerLocked, ()=>{});
+    } else if (state.questFlags.coinLockerOpened) {
+      showDialogue([['主人公','開いたままの古いロッカーだ。中にはもう何もない。','hero'], ['主人公','裏路地へ続く道のことだけが、頭から離れない。','hero']], ()=>{});
+    } else {
+      state.questFlags.coinLockerOpened = true;
+      state.questFlags.backyardRouteUnlocked = true;
+      state.questFlags.hasFlashlight = true;
+      state.questFlags.hasOldWingMapFragment = true;
+      showDialogue(storyNodes.coinLockerOpen, () => { rebuildAreaPreservePlayer(); saveToSlot(1,true); });
+    }
+  } else if (entity.id === 'backyardShrine') {
+    playSfx('lantern_buzz');
+    state.questFlags.backyardShrineNoiseHeard = true;
+    showDialogue(storyNodes.backyardShrine, () => { saveToSlot(1,true); });
+  } else if (entity.id === 'backyardWindow') {
+    playSfx('scare_sting');
+    state.questFlags.backyardWindowSeen = true;
+    showDialogue(storyNodes.backyardWindow, () => { saveToSlot(1,true); });
+  } else if (entity.id === 'backyard203Tag') {
+    playSfx('paper');
+    state.questFlags.hasRoom203Tag = true;
+    state.questFlags.backyardRouteCompleted = true;
+    dynamicGroup.remove(entity.mesh);
+    removeItem(entity.id);
+    showDialogue(storyNodes.backyard203Tag, () => { saveToSlot(1,true); rebuildAreaPreservePlayer(); });
+  } else if (entity.id === 'backyardLockedGate') {
+    playSfx('metal_rattle');
+    showDialogue(storyNodes.backyardLockedGate, () => { saveToSlot(1,true); });
   } else if (entity.id === 'scheduleNote' && state.step === 'start_note') {
     playSfx('paper');
     showDialogue(storyNodes.home_note, () => setStep('leave_home'));
@@ -3660,18 +3836,21 @@ function startDotMiniGame(){
     overlay.style.zIndex = '80';
     overlay.style.display = 'grid';
     overlay.style.placeItems = 'center';
-    overlay.style.background = 'rgba(5,8,12,.88)';
+    overlay.style.background = 'rgba(5,8,12,.92)';
     overlay.innerHTML = `
-      <div style="width:min(92vw,520px); padding:18px; border:1px solid rgba(220,190,120,.45); border-radius:18px; background:linear-gradient(180deg,rgba(25,22,18,.96),rgba(7,8,10,.98)); box-shadow:0 22px 80px rgba(0,0,0,.55); color:#f5ead0; font-family:system-ui,-apple-system,sans-serif;">
-        <div style="font-weight:800; letter-spacing:.08em; margin-bottom:10px; font-size:18px;">古いドットRPG</div>
-        <canvas width="384" height="288" style="width:100%; image-rendering:pixelated; border-radius:10px; background:#111; border:1px solid rgba(255,255,255,.14);"></canvas>
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; user-select:none;">
-          <span></span><button data-move="up" style="font-size:22px;padding:12px;border-radius:12px;">▲</button><span></span>
-          <button data-move="left" style="font-size:22px;padding:12px;border-radius:12px;">◀</button><button data-move="down" style="font-size:22px;padding:12px;border-radius:12px;">▼</button><button data-move="right" style="font-size:22px;padding:12px;border-radius:12px;">▶</button>
+      <div style="width:min(94vw,540px); padding:16px; border:1px solid rgba(220,190,120,.48); border-radius:18px; background:linear-gradient(180deg,rgba(25,22,18,.96),rgba(7,8,10,.98)); box-shadow:0 22px 80px rgba(0,0,0,.6); color:#f5ead0; font-family:system-ui,-apple-system,sans-serif;">
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:8px;">
+          <div>
+            <div data-title style="font-weight:900; letter-spacing:.08em; font-size:18px;">旧館迷路</div>
+            <div data-help style="opacity:.78; font-size:12px; margin-top:2px;">10ステージを突破すると銀鍵を入手</div>
+          </div>
+          <button data-close="1" style="padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:#171a22;color:#f5ead0;font-weight:800;">戻る</button>
         </div>
-        <div style="display:flex; justify-content:space-between; gap:10px; margin-top:12px; align-items:center;">
-          <div style="opacity:.82; font-size:13px;">壁に触れず、★まで進む</div>
-          <button data-close="1" style="padding:10px 14px;border-radius:12px;">やめる</button>
+        <canvas width="384" height="288" style="width:100%; image-rendering:pixelated; border-radius:10px; background:#111; border:1px solid rgba(255,255,255,.14);"></canvas>
+        <div data-status style="min-height:22px; margin-top:8px; font-size:13px; color:#f5d184;">STAGE 1 / 10</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:10px; user-select:none;">
+          <span></span><button data-move="up" style="font-size:22px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:#252936;color:#fff;">▲</button><span></span>
+          <button data-move="left" style="font-size:22px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:#252936;color:#fff;">◀</button><button data-move="down" style="font-size:22px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:#252936;color:#fff;">▼</button><button data-move="right" style="font-size:22px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:#252936;color:#fff;">▶</button>
         </div>
       </div>`;
     document.getElementById('game-root').appendChild(overlay);
@@ -3679,67 +3858,122 @@ function startDotMiniGame(){
   overlay.style.display = 'grid';
   const canvas = overlay.querySelector('canvas');
   const ctx = canvas.getContext('2d');
-  const map = [
-    '############',
-    '#P...#.....#',
-    '#.##.#.###.#',
-    '#....#...#.#',
-    '####.###.#.#',
-    '#....#...#.#',
-    '#.####.#...#',
-    '#......###G#',
-    '############'
-  ];
-  const grid = map.map(r => r.split(''));
+  const status = overlay.querySelector('[data-status]');
+  const title = overlay.querySelector('[data-title]');
+  const help = overlay.querySelector('[data-help]');
   const tile = 32;
-  let px = 1, py = 1;
-  let finished = false;
-  function draw(){
-    ctx.fillStyle = '#0f1420'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const stages = [
+    {name:'STAGE 1', note:'まずは★へ。', map:['############','#P.......G.#','#.##########','#..........#','#.##########','#..........#','#.##########','#..........#','############']},
+    {name:'STAGE 2', note:'遠回りの道。', map:['############','#P....#...G#','#.##.##.####','#....#.....#','####.#####.#','#....#.....#','#.####.###.#','#......#...#','############']},
+    {name:'STAGE 3', note:'鍵を拾って扉を開ける。', map:['############','#P...#...DG#','#.##.#.#####','#..K.#.....#','####.###.#.#','#....#...#.#','#.####.#...#','#......###.#','############']},
+    {name:'STAGE 4', note:'巡回する影に触れるとやり直し。', map:['############','#P...#...G.#','#.##.#.###.#','#....#E..#.#','####.###.#.#','#....#...#.#','#.####.#...#','#......###.#','############']},
+    {name:'STAGE 5', note:'罠床を避けて鍵へ。', map:['############','#P...#..DG.#','#.##.#.#####','#..K.#..E..#','####.###.#.#','#..T.#...#.#','#.####T#...#','#......###.#','############']},
+    {name:'STAGE 6', note:'敵が二体。焦らず待つ。', map:['############','#P....#..G.#','#.##E##.##.#','#....#.....#','####.#####.#','#..K.#..D..#','#.####.###.#','#...E..#...#','############']},
+    {name:'STAGE 7', note:'視界が狭くなる。', dark:true, map:['############','#P..#....DG#','#.#.#.######','#.#...E...K#','#.#######..#','#......#...#','#.####.#.###','#....E.....#','############']},
+    {name:'STAGE 8', note:'敵の動きが速い。', dark:true, fast:true, map:['############','#P...#...DG#','#.##.#E#####','#..K.#.....#','####.###.#.#','#E...#...#.#','#.####.#...#','#......###.#','############']},
+    {name:'STAGE 9', note:'偽の近道に注意。', dark:true, fast:true, map:['############','#P..E#...DG#','#.##.#.#####','#..K.#..T..#','####.###.#.#','#....#...#.#','#.####T#E..#','#......###.#','############']},
+    {name:'STAGE 10', note:'最後の旧館迷路。', dark:true, fast:true, map:['############','#P..#....DG#','#.#.#.######','#.#K..E...T#','#.#######..#','#..E...#...#','#.####.#.###','#....T..E..#','############']}
+  ];
+  let stageIndex = 0, grid, px, py, startX, startY, hasKey, enemies, movingLocked = false;
+  function parseStage(){
+    const raw = stages[stageIndex].map(r => r.split(''));
+    grid = raw; enemies = []; hasKey = false;
     for(let y=0;y<grid.length;y++) for(let x=0;x<grid[y].length;x++){
       const c = grid[y][x];
-      if(c === '#') { ctx.fillStyle = '#3b2f24'; ctx.fillRect(x*tile,y*tile,tile,tile); ctx.fillStyle = '#5c4735'; ctx.fillRect(x*tile+3,y*tile+3,tile-6,tile-6); }
-      else { ctx.fillStyle = '#1c2832'; ctx.fillRect(x*tile,y*tile,tile,tile); ctx.fillStyle = '#223746'; ctx.fillRect(x*tile+1,y*tile+1,tile-2,tile-2); }
-      if(c === 'G') { ctx.fillStyle = '#f1d372'; ctx.font = '24px monospace'; ctx.fillText('★', x*tile+8, y*tile+24); }
+      if(c==='P'){ px=x; py=y; startX=x; startY=y; grid[y][x]='.'; }
+      if(c==='E'){ enemies.push({x,y,dx:(stageIndex%2?1:0),dy:(stageIndex%2?0:1)}); grid[y][x]='.'; }
     }
-    ctx.fillStyle = '#8fd1ff'; ctx.fillRect(px*tile+8,py*tile+6,16,22);
-    ctx.fillStyle = '#0b121a'; ctx.fillRect(px*tile+12,py*tile+10,4,4); ctx.fillRect(px*tile+20,py*tile+10,4,4);
+    title.textContent = '旧館迷路 ' + (stageIndex+1) + '/10';
+    help.textContent = stages[stageIndex].note;
+    status.textContent = 'STAGE ' + (stageIndex+1) + ' / 10';
+    movingLocked = false;
+    draw();
   }
-  function close(){ overlay.style.display='none'; state.menuOpen=false; window.removeEventListener('keydown', onKey); }
-  function clear(){
-    if(finished) return;
-    finished = true;
+  function close(withMessage){
+    overlay.style.display = 'none';
+    state.menuOpen = false;
+    window.removeEventListener('keydown', onKey);
+    if (withMessage) showDialogue(storyNodes.arcadeMiniGameQuit, ()=>{});
+  }
+  function clearAll(){
     playSfx('note_pickup');
     state.questFlags.miniGameCleared = true;
     state.questFlags.hasMiniRouteKey = true;
-    close();
+    state.questFlags.miniGameStageCleared = 10;
+    close(false);
     showDialogue(storyNodes.arcadeMiniGameClear, () => { rebuildAreaPreservePlayer(); saveToSlot(1, true); });
   }
+  function clearStage(){
+    if(movingLocked) return;
+    movingLocked = true;
+    state.questFlags.miniGameStageCleared = Math.max(state.questFlags.miniGameStageCleared || 0, stageIndex + 1);
+    playSfx('ui_tap');
+    if(stageIndex >= stages.length - 1) { window.setTimeout(clearAll, 450); return; }
+    status.textContent = 'STAGE ' + (stageIndex+1) + ' CLEAR';
+    window.setTimeout(()=>{ stageIndex++; parseStage(); }, 650);
+  }
+  function resetStage(reason){
+    playSfx(reason === 'enemy' ? 'scare_sting' : 'metal_rattle');
+    status.textContent = reason === 'enemy' ? '捕まった。ステージをやり直す。' : '危険な床に触れた。';
+    window.setTimeout(parseStage, 500);
+  }
+  function blocked(x,y){
+    const c = grid[y] && grid[y][x];
+    if(!c || c==='#') return true;
+    if(c==='D' && !hasKey) return true;
+    return false;
+  }
+  function moveEnemies(){
+    const steps = stages[stageIndex].fast ? 2 : 1;
+    for(let k=0;k<steps;k++){
+      for(const e of enemies){
+        let nx=e.x+e.dx, ny=e.y+e.dy;
+        if(blocked(nx,ny) || grid[ny][nx]==='T') { e.dx*=-1; e.dy*=-1; nx=e.x+e.dx; ny=e.y+e.dy; }
+        if(!blocked(nx,ny) && grid[ny][nx]!=='T'){ e.x=nx; e.y=ny; }
+        if(e.x===px && e.y===py) return true;
+      }
+    }
+    return false;
+  }
   function move(dx,dy){
-    if(finished) return;
+    if(movingLocked) return;
     const nx=px+dx, ny=py+dy;
-    if(grid[ny][nx] === '#'){ playSfx('metal_rattle'); return; }
-    px=nx; py=ny; playSfx('ui_tap'); draw();
-    if(grid[py][px] === 'G') clear();
+    if(blocked(nx,ny)){ playSfx('metal_rattle'); return; }
+    px=nx; py=ny;
+    const cell = grid[py][px];
+    if(cell==='K'){ hasKey=true; grid[py][px]='.'; status.textContent='鍵を拾った。'; playSfx('note_pickup'); }
+    else if(cell==='T'){ draw(); resetStage('trap'); return; }
+    else playSfx('ui_tap');
+    if(moveEnemies()){ draw(); resetStage('enemy'); return; }
+    draw();
+    if(cell==='G') clearStage();
+  }
+  function draw(){
+    ctx.fillStyle = '#0b0f17'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(let y=0;y<grid.length;y++) for(let x=0;x<grid[y].length;x++){
+      if(stages[stageIndex].dark && Math.abs(x-px)+Math.abs(y-py)>4) { ctx.fillStyle='#050609'; ctx.fillRect(x*tile,y*tile,tile,tile); continue; }
+      const c=grid[y][x];
+      ctx.fillStyle = c==='#' ? '#3b2f24' : '#1c2832'; ctx.fillRect(x*tile,y*tile,tile,tile);
+      if(c==='#'){ ctx.fillStyle='#5c4735'; ctx.fillRect(x*tile+3,y*tile+3,tile-6,tile-6); }
+      else { ctx.fillStyle='#223746'; ctx.fillRect(x*tile+1,y*tile+1,tile-2,tile-2); }
+      if(c==='G'){ ctx.fillStyle='#f1d372'; ctx.font='24px monospace'; ctx.fillText('★',x*tile+8,y*tile+24); }
+      if(c==='K'){ ctx.fillStyle='#d5c07a'; ctx.font='22px monospace'; ctx.fillText('⚿',x*tile+8,y*tile+24); }
+      if(c==='D'){ ctx.fillStyle=hasKey?'#5a4a2e':'#2b2420'; ctx.fillRect(x*tile+6,y*tile+4,20,26); }
+      if(c==='T'){ ctx.fillStyle='#5a1820'; ctx.fillRect(x*tile+6,y*tile+6,20,20); }
+    }
+    for(const e of enemies){ ctx.fillStyle='#0b0b0f'; ctx.fillRect(e.x*tile+7,e.y*tile+4,18,26); ctx.fillStyle='#93d29a'; ctx.fillRect(e.x*tile+10,e.y*tile+10,5,5); ctx.fillRect(e.x*tile+18,e.y*tile+10,5,5); }
+    ctx.fillStyle='#8fd1ff'; ctx.fillRect(px*tile+8,py*tile+6,16,22); ctx.fillStyle='#0b121a'; ctx.fillRect(px*tile+12,py*tile+10,4,4); ctx.fillRect(px*tile+20,py*tile+10,4,4);
+    if(hasKey){ ctx.fillStyle='#f2d57a'; ctx.font='14px monospace'; ctx.fillText('KEY',8,18); }
   }
   function onKey(e){
-    if(e.key === 'ArrowUp') move(0,-1);
-    else if(e.key === 'ArrowDown') move(0,1);
-    else if(e.key === 'ArrowLeft') move(-1,0);
-    else if(e.key === 'ArrowRight') move(1,0);
-    else if(e.key === 'Escape') close();
+    if(e.key==='ArrowUp') move(0,-1); else if(e.key==='ArrowDown') move(0,1); else if(e.key==='ArrowLeft') move(-1,0); else if(e.key==='ArrowRight') move(1,0); else if(e.key==='Escape') close(true);
   }
-  overlay.querySelectorAll('[data-move]').forEach(btn => {
-    btn.onclick = () => {
-      const d = btn.dataset.move;
-      if(d==='up') move(0,-1); if(d==='down') move(0,1); if(d==='left') move(-1,0); if(d==='right') move(1,0);
-    };
-  });
-  overlay.querySelector('[data-close]').onclick = close;
+  overlay.querySelectorAll('[data-move]').forEach(btn => { btn.onclick = () => { const d=btn.dataset.move; if(d==='up') move(0,-1); if(d==='down') move(0,1); if(d==='left') move(-1,0); if(d==='right') move(1,0); }; });
+  overlay.querySelector('[data-close]').onclick = () => close(true);
+  window.removeEventListener('keydown', onKey);
   window.addEventListener('keydown', onKey);
-  draw();
+  parseStage();
 }
-
 function applyEndingScreen(type){
   if (!endingTitleEl || !endingTextEl) return;
   if (type === 'return') {
@@ -4202,6 +4436,10 @@ function updatePrompt(){
 
 function updateObjectiveDistance(){
   const def = currentStep();
+  if (state.area === 'oldwing' || state.area === 'oldhall' || state.area === 'backyard' || state.step === 'oldwing_search_key' || state.step === 'oldwing_key_obtained') {
+    distanceLabelEl.textContent = def.sub || def.text || '探索';
+    return;
+  }
   const approx = calculateDistanceToObjective();
   distanceLabelEl.textContent = def.sub + ' 約' + Math.max(1, Math.round(approx)) + 'm';
 }
@@ -4244,7 +4482,7 @@ function updateMinimap(){
   roundRect(minimapCtx, 0,0,minimap.width,minimap.height,22); minimapCtx.fill();
   minimapCtx.fillStyle = '#a79b84'; minimapCtx.font = '12px sans-serif'; minimapCtx.fillText('館内導線', 14, 18);
   const nodes = {
-    home:[18,30], town:[60,30], lobby:[104,30], kitchen:[104,72], corridor:[156,30], room201:[204,12], room202:[204,48], bath:[252,14], archive:[156,72], north:[204,86], detached:[252,72], oldhall:[298,72], oldwing:[298,116]
+    home:[18,30], town:[60,30], backyard:[60,72], lobby:[104,30], kitchen:[104,72], corridor:[156,30], room201:[204,12], room202:[204,48], bath:[252,14], archive:[156,72], north:[204,86], detached:[252,72], oldhall:[298,72], oldwing:[298,116]
   };
   minimapCtx.strokeStyle='rgba(255,255,255,.14)'; minimapCtx.lineWidth=2;
   Object.keys(graph).forEach(k=>{ Object.keys(graph[k]).forEach(to=>{ if(k<to){ const a=nodes[k], b=nodes[to]; if(!a || !b) return; minimapCtx.beginPath(); minimapCtx.moveTo(a[0],a[1]); minimapCtx.lineTo(b[0],b[1]); minimapCtx.stroke(); } }); });
