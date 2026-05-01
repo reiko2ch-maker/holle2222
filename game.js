@@ -497,6 +497,12 @@ function ensureQuestFlagDefaults(flags){
   q.oldWingRandomChaseArmed ??= false;
   q.replaceEndingMovieSeen ??= false;
   q.endingType ??= '';
+  q.oldWingRequestsStarted ??= false;
+  q.oldWingCombFound ??= false;
+  q.oldWingPhotoFound ??= false;
+  q.oldWingMedicineFound ??= false;
+  q.oldWingRequestsDone ??= false;
+  q.oldWingReleaseEndingSeen ??= false;
   return q;
 }
 
@@ -575,7 +581,8 @@ const stepDefs = {
   ending_guest: { day: 3, phase: '結末', text: '宿泊エンド', sub: '宿泊', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingSign' } },
   ending_replace: { day: 3, phase: '結末', text: '交代エンド', sub: '交代', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingFollow' } },
   oldwing_search_key: { day: 3, phase: '旧館', text: '旧館で鍵を探す', sub: '鍵を探す', targetArea: 'oldwing', targetPos: { x: 6.2, z: -5.2 }, trigger: { type: 'item', id: 'oldWingDeepKey' } },
-  oldwing_key_obtained: { day: 3, phase: '旧館', text: '見つけた鍵で旧館のさらに奥を目指す', sub: '旧館奥へ', targetArea: 'oldwing', targetPos: { x: 0.0, z: -8.3 }, trigger: { type: 'item', id: 'oldWingInnerDoor' } }
+  oldwing_key_obtained: { day: 3, phase: '旧館', text: '見つけた鍵で旧館のさらに奥を目指す', sub: '旧館奥へ', targetArea: 'oldwing', targetPos: { x: 0.0, z: -8.3 }, trigger: { type: 'item', id: 'oldWingInnerDoor' } },
+  ending_release: { day: 3, phase: '結末', text: '供養エンド', sub: '供養', targetArea: 'oldwing', targetPos: { x: 0.0, z: -8.3 }, trigger: { type: 'item', id: 'oldWingInnerDoor' } }
 };
 
 
@@ -836,6 +843,32 @@ const storyNodes = {
   oldWingInnerDoor: [
     ['主人公', `鍵穴は合う。けれど、扉の向こうから湿った熱が漏れている。`, 'hero'],
     ['主人公', `ここから先は、まだ戻れなくなる気がした。`, 'hero']
+  ],
+  oldWingRequestNote: [
+    ['主人公', `破れた紙に、鉛筆で小さく書かれている。`, 'hero'],
+    ['紙片', `「なくしたものを戻して。櫛、写真、薬。三つ揃えば、奥の扉は静かになる」`, 'hero'],
+    ['主人公', `これは、宿の客たちの依頼……なのか。`, 'hero']
+  ],
+  oldWingRequestComb: [
+    ['主人公', `焦げた鏡台の下から、欠けた櫛を拾った。`, 'hero'],
+    ['主人公', `触れた瞬間、女の人のすすり泣く声が一瞬だけ聞こえた。`, 'hero']
+  ],
+  oldWingRequestPhoto: [
+    ['主人公', `畳の隙間に、家族写真が挟まっていた。`, 'hero'],
+    ['主人公', `顔の部分だけ黒く焦げている。でも、誰かがずっと探していたものだ。`, 'hero']
+  ],
+  oldWingRequestMedicine: [
+    ['主人公', `古い薬包を見つけた。湿気で文字は滲んでいる。`, 'hero'],
+    ['主人公', `廊下の奥で、子どもの咳のような音がした。`, 'hero']
+  ],
+  oldWingRequestsComplete: [
+    ['主人公', `三つの忘れ物を集めた。`, 'hero'],
+    ['主人公', `旧館の奥で、鍵が回るような音がした。`, 'hero']
+  ],
+  ending_release: [
+    ['主人公', `櫛、写真、薬包を、奥の扉の前に置いた。`, 'hero'],
+    ['主人公', `旧館に残っていた足音が、ひとつずつ遠ざかっていく。`, 'hero'],
+    ['女将', `……そうかい。あの人たちも、やっと帰れたんだね。`, 'okami']
   ],
   hideSuccess: [
     ['主人公', `息を殺す。`, 'hero'],
@@ -2923,6 +2956,21 @@ function buildOldWing(){
     ['焼けた客室', -6.8, 0.4, Math.PI/2], ['物置', -6.8, -4.5, Math.PI/2], ['配膳室', 6.8, -0.8, -Math.PI/2], ['管理人室', 6.8, -5.9, -Math.PI/2]
   ];
   labels.forEach(([text,x,z,ry])=>{ const m = makeTextPlane(text,1.0,0.26,{fg:'#f4e6ce',bg:'rgba(0,0,0,.46)',fontSize:70}); m.position.set(x,1.62,z); m.rotation.y = ry; areaGroup.add(m); });
+  // B39: old wing detail pass - locked rooms, traces, request route props
+  addWallGlow(-6.9, 1.45, 3.25, 1.8, 1.2, Math.PI/2, 0xff6b47, 0.07);
+  addWallGlow(6.9, 1.35, -5.25, 1.9, 1.15, -Math.PI/2, 0xff4b38, 0.06);
+  addOldWingDebris(-3.1, 4.2, 0.2, 1.0);
+  addOldWingDebris(3.8, 1.8, -0.5, 0.9);
+  addOldWingDebris(-5.8, -7.0, 0.8, 1.1);
+  addTornCurtain(-8.95, 4.0, Math.PI/2);
+  addTornCurtain(8.95, -3.4, -Math.PI/2);
+  const roomLocks = [[-4.85,5.4,'施錠'],[4.85,4.8,'施錠'],[-4.85,-3.8,'焼失'],[4.85,-6.9,'管理']];
+  roomLocks.forEach(([x,z,t])=>{ const tag=makeTextPlane(t,0.52,0.18,{fg:'#f7ead2',bg:'rgba(40,0,0,.52)',fontSize:58}); tag.position.set(x,1.42,z); tag.rotation.y = x < 0 ? Math.PI/2 : -Math.PI/2; areaGroup.add(tag); });
+  if (!state.questFlags.oldWingRequestsStarted) addOldWingDocument('oldWingRequestNote','破れた依頼メモ',-1.4,4.8,0xc7b18d);
+  if (state.questFlags.oldWingRequestsStarted && !state.questFlags.oldWingCombFound) addOldWingDocument('oldWingComb','欠けた櫛',-7.05,0.95,0x8a5a3a);
+  if (state.questFlags.oldWingRequestsStarted && !state.questFlags.oldWingPhotoFound) addOldWingDocument('oldWingPhoto','焦げた写真',-6.25,-4.85,0x55504a);
+  if (state.questFlags.oldWingRequestsStarted && !state.questFlags.oldWingMedicineFound) addOldWingDocument('oldWingMedicine','古い薬包',6.15,2.7,0xd9d0ba);
+
   const stainMat = new THREE.MeshBasicMaterial({ color:0x5a0000, transparent:true, opacity:0.45, depthWrite:false });
   [[-2.7,3.2,0.7,0.24,0.2],[2.9,-3.2,1.1,0.2,-0.4],[-6.2,-6.8,0.8,0.18,0.8]].forEach(([x,z,w,d,r])=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),stainMat); m.position.set(x,0.026,z); m.rotation.x=-Math.PI/2; m.rotation.z=r; areaGroup.add(m); });
   for (const [x,z,r] of [[-1.2,1.7,0.3],[4.4,3.0,-0.25],[-3.7,-7.1,0.1],[2.4,-6.6,0.55]]) {
@@ -2954,6 +3002,29 @@ function addHideSpot(id,label,x,z,ry,display){
   g.traverse(m=>{ if(m.isMesh){ m.castShadow=true; m.receiveShadow=true; } });
   addItem(id,label,x,z,g,itemInteract);
   addBoxCollider(x,z,1.05,0.36);
+}
+
+function addOldWingDebris(x,z,rot,scale){
+  const s = scale || 1;
+  const g = new THREE.Group();
+  for(let i=0;i<3;i++){
+    const b = new THREE.Mesh(new THREE.BoxGeometry((0.9+Math.random()*0.45)*s,0.05,(0.12+Math.random()*0.08)*s), materials.darkWood);
+    b.position.set((Math.random()-.5)*0.45*s,0.04+i*0.012,(Math.random()-.5)*0.45*s);
+    b.rotation.y = (rot||0) + (Math.random()-.5)*0.9;
+    b.castShadow = b.receiveShadow = true;
+    g.add(b);
+  }
+  g.position.set(x,0,z); areaGroup.add(g);
+}
+function addOldWingDocument(id,label,x,z,color){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.035,0.32), new THREE.MeshStandardMaterial({color:color||0xd2c4a3, roughness:1}));
+  m.position.y = 0.08;
+  addItem(id,label,x,z,m,itemInteract);
+}
+function addTornCurtain(x,z,ry){
+  const mat = new THREE.MeshBasicMaterial({color:0x2d1f1d, transparent:true, opacity:0.72, side:THREE.DoubleSide});
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.9), mat);
+  p.position.set(x,1.35,z); p.rotation.y = ry || 0; areaGroup.add(p);
 }
 
 function buildArchive(){
@@ -3310,7 +3381,33 @@ function itemInteract(entity){
     showDialogue(storyNodes.oldWingFoundKey, () => setStep('oldwing_key_obtained'));
   } else if (entity.id === 'oldWingInnerDoor' && state.step === 'oldwing_key_obtained') {
     playSfx('metal_rattle');
-    showDialogue(storyNodes.oldWingInnerDoor, () => { saveToSlot(1, true); });
+    if (state.questFlags.oldWingRequestsDone && state.questFlags.oldWingDeepKeyFound) {
+      showDialogue(storyNodes.ending_release, () => {
+        setStep('ending_release');
+        finishEnding('release');
+      });
+    } else {
+      showDialogue(storyNodes.oldWingInnerDoor, () => { saveToSlot(1, true); });
+    }
+  } else if (entity.id === 'oldWingRequestNote') {
+    playSfx('paper');
+    state.questFlags.oldWingRequestsStarted = true;
+    showDialogue(storyNodes.oldWingRequestNote, () => { checkOldWingRequestProgress(); });
+  } else if (entity.id === 'oldWingComb') {
+    playSfx('paper');
+    state.questFlags.oldWingCombFound = true;
+    dynamicGroup.remove(entity.mesh); removeItem(entity.id);
+    showDialogue(storyNodes.oldWingRequestComb, () => { checkOldWingRequestProgress(); });
+  } else if (entity.id === 'oldWingPhoto') {
+    playSfx('paper');
+    state.questFlags.oldWingPhotoFound = true;
+    dynamicGroup.remove(entity.mesh); removeItem(entity.id);
+    showDialogue(storyNodes.oldWingRequestPhoto, () => { checkOldWingRequestProgress(); });
+  } else if (entity.id === 'oldWingMedicine') {
+    playSfx('paper');
+    state.questFlags.oldWingMedicineFound = true;
+    dynamicGroup.remove(entity.mesh); removeItem(entity.id);
+    showDialogue(storyNodes.oldWingRequestMedicine, () => { checkOldWingRequestProgress(); });
   } else if ((entity.id === 'hideCloset1' || entity.id === 'hideShelf1' || entity.id === 'hideFloor1') && state.area === 'oldwing') {
     hideFromOldWingChase(entity.id);
   } else if (entity.id === 'altar' && state.step === 'inspect_detached') {
@@ -3490,6 +3587,9 @@ function applyEndingScreen(type){
   } else if (type === 'replace') {
     endingTitleEl.textContent = '交代エンド';
     endingTextEl.innerHTML = '誘導員の役目を引き継いだ主人公は、<br>次の来客を正面玄関で静かに待ち続ける。';
+  } else if (type === 'release') {
+    endingTitleEl.textContent = '供養エンド';
+    endingTextEl.innerHTML = '忘れ物を返された客たちは、旧館から静かに離れていった。<br>旅館は残る。それでも、ひとつの夜だけは終わった。';
   } else {
     endingTitleEl.textContent = '第二夜・終了';
     endingTextEl.innerHTML = '自宅から始まった二日間の勤務で、旅館の異変は日常にまで滲み出した。<br>続きは次章へ。';
@@ -3540,6 +3640,20 @@ function getChaseCheckpoint(areaId, linkedStep){
   return { area: areaId, x: player.x, z: player.z, yaw: player.yaw, step: linkedStep, guideSpawn: { x: 0, z: 0 } };
 }
 
+
+function checkOldWingRequestProgress(){
+  const q = state.questFlags;
+  if (!q.oldWingRequestsDone && q.oldWingCombFound && q.oldWingPhotoFound && q.oldWingMedicineFound) {
+    q.oldWingRequestsDone = true;
+    playSfx('metal_rattle');
+    showDialogue(storyNodes.oldWingRequestsComplete, () => {
+      if (state.step === 'oldwing_search_key' && q.oldWingDeepKeyFound) setStep('oldwing_key_obtained');
+      else saveToSlot(1, true);
+    });
+  } else {
+    saveToSlot(1, true);
+  }
+}
 
 function startTimedOldWingChase(origin){
   if (state.chase || state.area !== 'oldwing' || state.step !== 'oldwing_search_key') return;
