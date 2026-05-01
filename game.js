@@ -503,6 +503,10 @@ function ensureQuestFlagDefaults(flags){
   q.oldWingMedicineFound ??= false;
   q.oldWingRequestsDone ??= false;
   q.oldWingReleaseEndingSeen ??= false;
+  q.rareRedMet ??= false;
+  q.rareWhiteMet ??= false;
+  q.hasMiniRouteKey ??= false;
+  q.miniGameCleared ??= false;
   return q;
 }
 
@@ -1035,6 +1039,18 @@ const characterAssets = {
     side: loadAssetTexture('assets/characters/crouch_pose.png'),
     portrait: loadAssetTexture('assets/characters/portrait_serious.png'),
     squat: 0.58
+  },
+  rare_red: {
+    front: loadAssetTexture('assets/characters/rare_red_front.png'),
+    side: loadAssetTexture('assets/characters/rare_red_front.png'),
+    portrait: loadAssetTexture('assets/characters/rare_red_front.png'),
+    alwaysFront: true
+  },
+  rare_white: {
+    front: loadAssetTexture('assets/characters/rare_white_front.png'),
+    side: loadAssetTexture('assets/characters/rare_white_front.png'),
+    portrait: loadAssetTexture('assets/characters/rare_white_front.png'),
+    alwaysFront: true
   }
 };
 const fallbackLabels = {
@@ -1056,7 +1072,10 @@ const fallbackLabels = {
   oldWingInnerDoor: '旧館奥の扉',
   hideCloset1: '押し入れ',
   hideShelf1: '倒れた棚',
-  hideFloor1: '床下収納'
+  hideFloor1: '床下収納',
+  arcadeMiniGame: '古い携帯ゲーム',
+  rareRedGuest: '赤パーカーの客',
+  rareWhiteGuest: '白パーカーの客'
 };
 
 const portraitPaths = {
@@ -1066,7 +1085,9 @@ const portraitPaths = {
   guest: 'assets/characters/portrait_serious.png',
   chef: 'assets/characters/portrait_serious.png',
   villager: 'assets/characters/portrait_smile.png',
-  guide: 'assets/characters/guide_portrait.png'
+  guide: 'assets/characters/guide_portrait.png',
+  rare_red: 'assets/characters/rare_red_front.png',
+  rare_white: 'assets/characters/rare_white_front.png'
 };
 function createBillboardCharacter(faceType, options={}){
   const profile = characterAssets[faceType] || characterAssets.hero;
@@ -2113,6 +2134,24 @@ function maybeStartDay3GuideTease(){
   ], () => saveToSlot(1, true));
 }
 
+storyNodes.rareRedGuest = [
+  ['赤パーカーの客','……あれ？こんな夜に散歩？ 変な場所に迷い込まない方がいいよ。','rare_red'],
+  ['主人公','妙に明るい。けれど、少し目を離したらもういなくなっていそうだ。','hero']
+];
+storyNodes.rareWhiteGuest = [
+  ['白パーカーの客','ここ、道がつながってるようで、つながってないんだよ。戻るなら今だよ。','rare_white'],
+  ['主人公','冗談のような口調なのに、目だけが笑っていなかった。','hero']
+];
+storyNodes.arcadeMiniGameIntro = [
+  ['主人公','古い携帯ゲーム機が落ちている。画面には小さな迷路が映っている。','hero'],
+  ['主人公','ゴールまで行けば、何かが開く……そんな文字が残っている。','hero']
+];
+storyNodes.arcadeMiniGameClear = [
+  ['主人公','ミニゲームをクリアした。内部の小さな蓋が開く音がした。','hero'],
+  ['主人公','小さな銀鍵を手に入れた。序盤の特殊ルートに使えそうだ。','hero']
+];
+
+
 function buildArea(areaId){
   areaGroup.clear(); dynamicGroup.clear(); clearArray(colliders); clearArray(doors); clearArray(npcs); clearArray(items); clearInteractionMarker(); state.previewGuide = null; state.cutscene = null;
   areaLabelEl.textContent = areaLabels[areaId];
@@ -2362,6 +2401,22 @@ function buildTown(){
   addNPC('villagerA','町の住民','villager','coat',-4.2,4.2,-0.4,npcInteract);
   addNPC('villagerB','町の住民','villager','casual',2.2,5.4,Math.PI*0.78,npcInteract);
   addNPC('villagerC','町の住民','villager','tracksuit',-8.2,-4.1,Math.PI*0.18,npcInteract);
+
+  // Optional early mini-game: a tiny Dragon Quest-like dot RPG challenge.
+  if (!state.questFlags.miniGameCleared) {
+    const arcade = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.76, 0.34), new THREE.MeshStandardMaterial({ color: 0x2c3140, roughness: 0.86 }));
+    body.position.y = 0.38; arcade.add(body);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.28), new THREE.MeshBasicMaterial({ color: 0x244b38 }));
+    screen.position.set(0,0.52,0.18); arcade.add(screen);
+    const keyLabel = makeTextPlane('ミニゲーム', 0.45, 0.28, { fg:'#dfffe7', bg:'rgba(0,0,0,.35)', fontSize:58 });
+    keyLabel.position.set(0,0.95,0.2); arcade.add(keyLabel);
+    addItem('arcadeMiniGame','古い携帯ゲーム',-5.65,-2.9,arcade,itemInteract);
+    addFloorShadow(-5.65,-2.9,1.0,0.8,0.12);
+  }
+
+  // Rare cameo characters. They are placed away from the main route so they feel like discoveries, not blockers.
+  addNPC('rareRedGuest','赤パーカーの客','rare_red','rare_red',-6.8,6.0,Math.PI*0.7,npcInteract);
 }
 
 
@@ -2980,6 +3035,8 @@ function buildOldWing(){
   addHideSpot('hideCloset1','押し入れに隠れる',-7.25,1.8, Math.PI/2, '押入');
   addHideSpot('hideShelf1','棚裏に隠れる',1.8,-3.55, 0, '棚裏');
   addHideSpot('hideFloor1','床下収納に隠れる',6.65,2.55, -Math.PI/2, '床下');
+  addNPC('rareWhiteGuest','白パーカーの客','rare_white','rare_white',7.35,5.75,-Math.PI*0.7,npcInteract);
+
   if (!state.questFlags.oldWingDeepKeyFound) {
     const keyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.08,0.18), materials.brass);
     keyMesh.position.y = 0.08;
@@ -3211,13 +3268,26 @@ function npcInteract(entity){
     }
   } else if (entity.id === 'chef' && state.step === 'get_tray') {
     showDialogue(storyNodes.tray, ()=>{});
+  } else if (entity.id === 'rareRedGuest') {
+    state.questFlags.rareRedMet = true;
+    showDialogue(storyNodes.rareRedGuest, ()=>{ saveToSlot(1, true); });
+  } else if (entity.id === 'rareWhiteGuest') {
+    state.questFlags.rareWhiteMet = true;
+    showDialogue(storyNodes.rareWhiteGuest, ()=>{ saveToSlot(1, true); });
   } else if (entity.id && entity.id.startsWith('villager')) {
     showDialogue(storyNodes.villager, ()=>{});
   }
 }
 
 function itemInteract(entity){
-  if (entity.id === 'scheduleNote' && state.step === 'start_note') {
+  if (entity.id === 'arcadeMiniGame') {
+    playSfx('ui_tap');
+    if (state.questFlags.miniGameCleared) {
+      showDialogue([['主人公','古い携帯ゲーム機だ。画面には「CLEAR」の文字が残っている。','hero'], ['主人公','中から出てきた小さな銀鍵は、まだ持っている。','hero']], ()=>{});
+    } else {
+      showDialogue(storyNodes.arcadeMiniGameIntro, () => startDotMiniGame());
+    }
+  } else if (entity.id === 'scheduleNote' && state.step === 'start_note') {
     playSfx('paper');
     showDialogue(storyNodes.home_note, () => setStep('leave_home'));
   } else if (entity.id === 'tray' && state.step === 'get_tray') {
@@ -3574,6 +3644,100 @@ function startReplaceEndingMovie(){
       finishEnding('replace');
     });
   });
+}
+
+
+function startDotMiniGame(){
+  unlockAudio();
+  state.menuOpen = true;
+  resetInput();
+  let overlay = document.getElementById('dot-minigame-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'dot-minigame-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.zIndex = '80';
+    overlay.style.display = 'grid';
+    overlay.style.placeItems = 'center';
+    overlay.style.background = 'rgba(5,8,12,.88)';
+    overlay.innerHTML = `
+      <div style="width:min(92vw,520px); padding:18px; border:1px solid rgba(220,190,120,.45); border-radius:18px; background:linear-gradient(180deg,rgba(25,22,18,.96),rgba(7,8,10,.98)); box-shadow:0 22px 80px rgba(0,0,0,.55); color:#f5ead0; font-family:system-ui,-apple-system,sans-serif;">
+        <div style="font-weight:800; letter-spacing:.08em; margin-bottom:10px; font-size:18px;">古いドットRPG</div>
+        <canvas width="384" height="288" style="width:100%; image-rendering:pixelated; border-radius:10px; background:#111; border:1px solid rgba(255,255,255,.14);"></canvas>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; user-select:none;">
+          <span></span><button data-move="up" style="font-size:22px;padding:12px;border-radius:12px;">▲</button><span></span>
+          <button data-move="left" style="font-size:22px;padding:12px;border-radius:12px;">◀</button><button data-move="down" style="font-size:22px;padding:12px;border-radius:12px;">▼</button><button data-move="right" style="font-size:22px;padding:12px;border-radius:12px;">▶</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; gap:10px; margin-top:12px; align-items:center;">
+          <div style="opacity:.82; font-size:13px;">壁に触れず、★まで進む</div>
+          <button data-close="1" style="padding:10px 14px;border-radius:12px;">やめる</button>
+        </div>
+      </div>`;
+    document.getElementById('game-root').appendChild(overlay);
+  }
+  overlay.style.display = 'grid';
+  const canvas = overlay.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+  const map = [
+    '############',
+    '#P...#.....#',
+    '#.##.#.###.#',
+    '#....#...#.#',
+    '####.###.#.#',
+    '#....#...#.#',
+    '#.####.#...#',
+    '#......###G#',
+    '############'
+  ];
+  const grid = map.map(r => r.split(''));
+  const tile = 32;
+  let px = 1, py = 1;
+  let finished = false;
+  function draw(){
+    ctx.fillStyle = '#0f1420'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(let y=0;y<grid.length;y++) for(let x=0;x<grid[y].length;x++){
+      const c = grid[y][x];
+      if(c === '#') { ctx.fillStyle = '#3b2f24'; ctx.fillRect(x*tile,y*tile,tile,tile); ctx.fillStyle = '#5c4735'; ctx.fillRect(x*tile+3,y*tile+3,tile-6,tile-6); }
+      else { ctx.fillStyle = '#1c2832'; ctx.fillRect(x*tile,y*tile,tile,tile); ctx.fillStyle = '#223746'; ctx.fillRect(x*tile+1,y*tile+1,tile-2,tile-2); }
+      if(c === 'G') { ctx.fillStyle = '#f1d372'; ctx.font = '24px monospace'; ctx.fillText('★', x*tile+8, y*tile+24); }
+    }
+    ctx.fillStyle = '#8fd1ff'; ctx.fillRect(px*tile+8,py*tile+6,16,22);
+    ctx.fillStyle = '#0b121a'; ctx.fillRect(px*tile+12,py*tile+10,4,4); ctx.fillRect(px*tile+20,py*tile+10,4,4);
+  }
+  function close(){ overlay.style.display='none'; state.menuOpen=false; window.removeEventListener('keydown', onKey); }
+  function clear(){
+    if(finished) return;
+    finished = true;
+    playSfx('note_pickup');
+    state.questFlags.miniGameCleared = true;
+    state.questFlags.hasMiniRouteKey = true;
+    close();
+    showDialogue(storyNodes.arcadeMiniGameClear, () => { rebuildAreaPreservePlayer(); saveToSlot(1, true); });
+  }
+  function move(dx,dy){
+    if(finished) return;
+    const nx=px+dx, ny=py+dy;
+    if(grid[ny][nx] === '#'){ playSfx('metal_rattle'); return; }
+    px=nx; py=ny; playSfx('ui_tap'); draw();
+    if(grid[py][px] === 'G') clear();
+  }
+  function onKey(e){
+    if(e.key === 'ArrowUp') move(0,-1);
+    else if(e.key === 'ArrowDown') move(0,1);
+    else if(e.key === 'ArrowLeft') move(-1,0);
+    else if(e.key === 'ArrowRight') move(1,0);
+    else if(e.key === 'Escape') close();
+  }
+  overlay.querySelectorAll('[data-move]').forEach(btn => {
+    btn.onclick = () => {
+      const d = btn.dataset.move;
+      if(d==='up') move(0,-1); if(d==='down') move(0,1); if(d==='left') move(-1,0); if(d==='right') move(1,0);
+    };
+  });
+  overlay.querySelector('[data-close]').onclick = close;
+  window.addEventListener('keydown', onKey);
+  draw();
 }
 
 function applyEndingScreen(type){
