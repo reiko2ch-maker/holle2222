@@ -508,6 +508,9 @@ function ensureQuestFlagDefaults(flags){
   q.oldWingMedicineFound ??= false;
   q.oldWingRequestsDone ??= false;
   q.oldWingReleaseEndingSeen ??= false;
+  q.oldWingAltarSeen ??= false;
+  q.oldHallBloodNoteSeen ??= false;
+  q.oldHallReturnScarePlayed ??= false;
   q.rareRedMet ??= false;
   q.rareWhiteMet ??= false;
   q.hasMiniRouteKey ??= false;
@@ -600,6 +603,8 @@ const stepDefs = {
   ending_guest: { day: 3, phase: '結末', text: '宿泊エンド', sub: '宿泊', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingSign' } },
   ending_replace: { day: 3, phase: '結末', text: '交代エンド', sub: '交代', targetArea: 'lobby', targetPos: { x: 0.0, z: -4.25 }, trigger: { type: 'item', id: 'endingFollow' } },
   oldwing_search_key: { day: 3, phase: '旧館', text: '旧館で鍵を探す', sub: '鍵を探す', targetArea: 'oldwing', targetPos: { x: 6.2, z: -5.2 }, trigger: { type: 'item', id: 'oldWingDeepKey' } },
+  oldwing_memory_altar: { day: 3, phase: '旧館', text: '鍵が反応した供養台を調べる', sub: '供養台へ', targetArea: 'oldwing', targetPos: { x: -7.05, z: 5.75 }, trigger: { type: 'item', id: 'oldWingMemoryAltar' } },
+  oldhall_blood_note: { day: 3, phase: '旧館', text: '渡り廊下へ戻り、血の付いた紙片を調べる', sub: '血の紙片へ', targetArea: 'oldhall', targetPos: { x: 1.1, z: -11.4 }, trigger: { type: 'item', id: 'oldHallBloodNote' } },
   oldwing_key_obtained: { day: 3, phase: '旧館', text: '見つけた鍵で旧館のさらに奥を目指す', sub: '旧館奥へ', targetArea: 'oldwing', targetPos: { x: 0.0, z: -8.3 }, trigger: { type: 'item', id: 'oldWingInnerDoor' } },
   ending_release: { day: 3, phase: '結末', text: '供養エンド', sub: '供養', targetArea: 'oldwing', targetPos: { x: 0.0, z: -8.3 }, trigger: { type: 'item', id: 'oldWingInnerDoor' } }
 };
@@ -885,6 +890,22 @@ const storyNodes = {
   oldWingRequestsComplete: [
     ['主人公', `三つの忘れ物を集めた。`, 'hero'],
     ['主人公', `旧館の奥で、鍵が回るような音がした。`, 'hero']
+  ],
+  oldWingAltarVision: [
+    ['主人公', `煤けた供養台だ。拾った鍵を近づけると、鈴みたいな音が鳴った。`, 'hero'],
+    ['幼い声', `まだ終わってない。渡り廊下、血の紙を見て。`, 'guest'],
+    ['主人公', `供養台の裏に、指で引きずったような赤い線が続いている。`, 'hero']
+  ],
+  oldHallBloodNote: [
+    ['主人公', `ガラス張りの廊下に、血の付いた紙片が落ちている。`, 'hero'],
+    ['紙片', `「鍵を持つ者は、奥の部屋で最後の名前を見る」`, 'hero'],
+    ['紙片', `「開けたあと、振り返るな」`, 'hero'],
+    ['主人公', `……旧館の奥へ戻るしかない。`, 'hero']
+  ],
+  oldWingInnerDoorAfterKey: [
+    ['主人公', `血の紙片に書かれていたとおり、鍵がぴたりと合った。`, 'hero'],
+    ['主人公', `扉の向こうから、何人分もの息遣いが聞こえる。`, 'hero'],
+    ['主人公', `ここから先は、あの夜の続きを見ることになる。`, 'hero']
   ],
   ending_release: [
     ['主人公', `櫛、写真、薬包を、奥の扉の前に置いた。`, 'hero'],
@@ -3187,24 +3208,30 @@ function startOldHallForcedScare(kind){
 function applyOldWingCorruption(){
   if (!state.questFlags.oldWingCorrupted) return;
   if (state.area === 'home' || state.area === 'town' || state.area === 'oldhall') return;
-  scene.background = new THREE.Color(0x120305);
-  scene.fog.color.set(0x280306);
-  scene.fog.near = Math.min(scene.fog.near || 12, 10);
-  scene.fog.far = Math.max(scene.fog.far || 34, 30);
-  hemi.intensity = Math.max(0.28, hemi.intensity * 0.62);
-  dirLight.intensity = Math.max(0.22, dirLight.intensity * 0.5);
-  const red = new THREE.PointLight(0xff1f1f, 0.95, 11, 2.2);
+  const severe = (state.area === 'lobby' || state.area === 'corridor' || state.area === 'archive' || state.area === 'north' || state.area === 'bath' || state.area === 'detached');
+  scene.background = new THREE.Color(severe ? 0x070001 : 0x120305);
+  scene.fog.color.set(severe ? 0x120002 : 0x280306);
+  scene.fog.near = Math.min(scene.fog.near || 12, severe ? 7 : 10);
+  scene.fog.far = Math.max(scene.fog.far || 34, severe ? 22 : 30);
+  hemi.intensity = severe ? Math.max(0.12, hemi.intensity * 0.28) : Math.max(0.22, hemi.intensity * 0.5);
+  dirLight.intensity = severe ? Math.max(0.08, dirLight.intensity * 0.18) : Math.max(0.16, dirLight.intensity * 0.35);
+  const red = new THREE.PointLight(0xff1717, severe ? 1.25 : 0.95, severe ? 9 : 11, 2.2);
   red.position.set(0, 1.55, -1.2);
   areaGroup.add(red);
-  const red2 = new THREE.PointLight(0x8b0000, 0.55, 8, 2.4);
+  const red2 = new THREE.PointLight(0x6c0000, severe ? 0.88 : 0.55, severe ? 7 : 8, 2.4);
   red2.position.set(-4.2, 1.35, 3.4);
   areaGroup.add(red2);
-  const hazeMat = new THREE.MeshBasicMaterial({ color:0x8c0b0b, transparent:true, opacity:0.08, depthWrite:false, side:THREE.DoubleSide });
+  if (severe) {
+    const red3 = new THREE.PointLight(0x3d0000, 0.48, 6, 2.0);
+    red3.position.set(3.8, 1.2, -4.8);
+    areaGroup.add(red3);
+  }
+  const hazeMat = new THREE.MeshBasicMaterial({ color: severe ? 0x5c0000 : 0x8c0b0b, transparent:true, opacity: severe ? 0.14 : 0.08, depthWrite:false, side:THREE.DoubleSide });
   const haze = new THREE.Mesh(new THREE.PlaneGeometry(18, 10), hazeMat);
   haze.position.set(0, 1.35, -1.0);
   haze.rotation.x = -Math.PI / 2;
   areaGroup.add(haze);
-  const bloodMat = new THREE.MeshBasicMaterial({ color:0x4c0000, transparent:true, opacity:0.55, depthWrite:false });
+  const bloodMat = new THREE.MeshBasicMaterial({ color:0x4c0000, transparent:true, opacity: severe ? 0.78 : 0.55, depthWrite:false });
   const spots = [
     [-3.4,-2.8,0.85,0.28,0.2], [2.2,1.9,0.65,0.22,-0.35], [0.6,-4.2,1.25,0.18,0.05], [4.1,3.3,0.52,0.2,0.8]
   ];
@@ -3212,6 +3239,12 @@ function applyOldWingCorruption(){
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w,d), bloodMat);
     m.position.set(x, 0.024, z); m.rotation.x = -Math.PI/2; m.rotation.z = r; areaGroup.add(m);
   });
+  if (severe) {
+    for (const [x,y,z,ry] of [[-6.8,1.6,-2.4,Math.PI/2],[6.7,1.45,1.2,-Math.PI/2],[0.0,1.7,-6.8,0]]) {
+      const smear = new THREE.Mesh(new THREE.PlaneGeometry(0.8,1.3), new THREE.MeshBasicMaterial({ color:0x610000, transparent:true, opacity:0.32, side:THREE.DoubleSide }));
+      smear.position.set(x,y,z); smear.rotation.y = ry; areaGroup.add(smear);
+    }
+  }
   for (const [x,z,r] of [[-5.2,0.8,0.18],[3.8,-3.4,-0.24],[0.8,4.8,0.4]]) {
     const board = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.045,0.18), materials.darkWood);
     board.position.set(x,0.045,z); board.rotation.y = r; areaGroup.add(board);
@@ -3222,7 +3255,18 @@ function applyOldWingCorruption(){
   }
 }
 function updateOldHallScares(){
-  if (state.area !== 'oldhall' || state.step !== 'cross_old_glass_corridor' || state.menuOpen || state.cutscene) return;
+  if (state.area !== 'oldhall' || state.menuOpen || state.cutscene) return;
+  if (state.step === 'oldhall_blood_note' && !state.questFlags.oldHallReturnScarePlayed) {
+    state.questFlags.oldHallReturnScarePlayed = true;
+    startCutscene([
+      { duration: 0.08 },
+      forceLookAtPoint(2.85, -12.4, -0.03, 0.48),
+      { duration: 0.16, onStart(){ playSfx('scare_sting'); } },
+      { duration: 0.42, onUpdate(t){ player.yaw = lerpAngle(player.yaw, lookYawToPoint(2.85, -12.4), easeInOut(t)); } }
+    ], ()=>{ saveToSlot(1,true); });
+    return;
+  }
+  if (state.step !== 'cross_old_glass_corridor') return;
   if (!state.questFlags.oldHallWindowScare1 && player.z < 3.2) {
     state.questFlags.oldHallWindowScare1 = true;
     startOldHallForcedScare('window1');
@@ -3275,6 +3319,19 @@ function buildOldHall(){
   const sign = makeTextPlane('旧館入口',1.1,0.26,{fg:'#e8dfcc',bg:'rgba(0,0,0,.35)',fontSize:78}); sign.position.set(0,2.68,-14.78); areaGroup.add(sign);
   addItem('oldHallEndDoor','旧館入口',0,-13.2,new THREE.Mesh(new THREE.BoxGeometry(1.6,0.1,1.0), new THREE.MeshBasicMaterial({ transparent:true, opacity:0.01 })), itemInteract);
   const note = makeTextPlane('焦げた案内札',1.0,0.26,{fg:'#332820',bg:'rgba(237,226,194,.92)',fontSize:72}); note.position.set(-1.4,1.18,-13.35); note.rotation.y=0.25; areaGroup.add(note);
+  if (state.questFlags.oldWingAltarSeen && !state.questFlags.oldHallBloodNoteSeen) {
+    const bloodPaper = new THREE.Group();
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.03,0.34), new THREE.MeshStandardMaterial({ color:0xe3d4ba, roughness:1 }));
+    p.position.y = 0.05;
+    const stain = new THREE.Mesh(new THREE.PlaneGeometry(0.34,0.18), new THREE.MeshBasicMaterial({ color:0x610000, transparent:true, opacity:0.82 }));
+    stain.rotation.x = -Math.PI/2; stain.position.set(0,0.071,0.02);
+    bloodPaper.add(p, stain);
+    addItem('oldHallBloodNote','血の紙片',1.1,-11.4,bloodPaper,itemInteract);
+  }
+  if (state.questFlags.oldWingCorrupted) {
+    addMoodLight(0, 1.45, -10.8, 0x7a0000, 0.34, 6.2);
+    addMoodLight(0, 1.45, -3.5, 0x5a0000, 0.18, 5.0);
+  }
 }
 
 
@@ -3342,6 +3399,17 @@ function buildOldWing(){
     const keyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.08,0.18), materials.brass);
     keyMesh.position.y = 0.08;
     addItem('oldWingDeepKey','錆びた鍵',6.2,-5.2,keyMesh,itemInteract);
+  }
+  if (state.questFlags.oldWingDeepKeyFound && !state.questFlags.oldWingAltarSeen) {
+    const altar = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.42,0.55), materials.darkWood);
+    base.position.y = 0.21;
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.52,0.04,0.24), new THREE.MeshStandardMaterial({color:0x726251, roughness:0.95}));
+    plate.position.y = 0.45;
+    const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.05,0.18,10), new THREE.MeshStandardMaterial({color:0xe7d6bc, roughness:1}));
+    candle.position.set(0.18,0.53,0);
+    altar.add(base, plate, candle);
+    addItem('oldWingMemoryAltar','供養台',-7.05,5.75,altar,itemInteract);
   }
   const innerDoor = new THREE.Mesh(new THREE.BoxGeometry(2.0,2.5,0.18), new THREE.MeshStandardMaterial({ color:0x21171a, roughness:0.9, metalness:0.2 }));
   innerDoor.position.set(0,1.25,-8.96); areaGroup.add(innerDoor);
@@ -3780,7 +3848,17 @@ function itemInteract(entity){
     playSfx('metal_rattle');
     state.questFlags.oldWingDeepKeyFound = true;
     state.questFlags.oldWingRandomChaseArmed = false;
-    showDialogue(storyNodes.oldWingFoundKey, () => setStep('oldwing_key_obtained'));
+    dynamicGroup.remove(entity.mesh);
+    removeItem(entity.id);
+    showDialogue(storyNodes.oldWingFoundKey, () => { rebuildAreaPreservePlayer(); setStep('oldwing_memory_altar'); });
+  } else if (entity.id === 'oldWingMemoryAltar' && state.step === 'oldwing_memory_altar') {
+    playSfx('scare_sting');
+    state.questFlags.oldWingAltarSeen = true;
+    showDialogue(storyNodes.oldWingAltarVision, () => { rebuildAreaPreservePlayer(); setStep('oldhall_blood_note'); });
+  } else if (entity.id === 'oldHallBloodNote' && state.step === 'oldhall_blood_note') {
+    playSfx('paper');
+    state.questFlags.oldHallBloodNoteSeen = true;
+    showDialogue(storyNodes.oldHallBloodNote, () => { rebuildAreaPreservePlayer(); setStep('oldwing_key_obtained'); });
   } else if (entity.id === 'oldWingInnerDoor' && state.step === 'oldwing_key_obtained') {
     playSfx('metal_rattle');
     if (state.questFlags.oldWingRequestsDone && state.questFlags.oldWingDeepKeyFound) {
@@ -3789,7 +3867,7 @@ function itemInteract(entity){
         finishEnding('release');
       });
     } else {
-      showDialogue(storyNodes.oldWingInnerDoor, () => { saveToSlot(1, true); });
+      showDialogue(storyNodes.oldWingInnerDoorAfterKey, () => { saveToSlot(1, true); });
     }
   } else if (entity.id === 'oldWingRequestNote') {
     playSfx('paper');
@@ -4693,8 +4771,8 @@ function movePlayer(dt){
   attemptMove(player.x + dx, player.z + dz);
   const moved = Math.hypot(player.x - bx, player.z - bz);
   if (moved > 0.0005) {
-    cameraMotion.bobPhase += moved * (isRunning ? 15.5 : 12.0);
-    cameraMotion.bobAmount = lerp(cameraMotion.bobAmount, isRunning ? 0.045 : 0.028, 0.18);
+    cameraMotion.bobPhase += moved * (isRunning ? 9.2 : 7.4);
+    cameraMotion.bobAmount = lerp(cameraMotion.bobAmount, isRunning ? 0.015 : 0.008, 0.12);
     cameraMotion.lastMoveSpeed = moved / Math.max(0.001, dt);
   } else {
     cameraMotion.bobAmount = lerp(cameraMotion.bobAmount, 0, 0.12);
