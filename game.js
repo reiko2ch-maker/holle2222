@@ -52,10 +52,10 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.32;
+renderer.toneMappingExposure = 1.50;
 
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 90);
-const player = { x: 0, z: 0, yaw: 0, pitch: 0, height: 1.62, radius: 0.33, speed: 3.28, run: 1.36 };
+const player = { x: 0, z: 0, yaw: 0, pitch: 0, height: 1.62, radius: 0.33, speed: 3.46, run: 1.42 };
 
 const rootGroup = new THREE.Group();
 scene.add(rootGroup);
@@ -64,9 +64,9 @@ const dynamicGroup = new THREE.Group();
 rootGroup.add(areaGroup);
 rootGroup.add(dynamicGroup);
 
-const hemi = new THREE.HemisphereLight(0xe2ecff, 0x5a4630, 1.12);
+const hemi = new THREE.HemisphereLight(0xeaf2ff, 0x6a5035, 1.20);
 scene.add(hemi);
-const fillAmbient = new THREE.AmbientLight(0xffffff, 0.26);
+const fillAmbient = new THREE.AmbientLight(0xffffff, 0.34);
 scene.add(fillAmbient);
 const dirLight = new THREE.DirectionalLight(0xfff4df, 1.08);
 dirLight.position.set(6, 10, 5);
@@ -114,6 +114,9 @@ const input = {
   runHeld: false,
   runToggle: false
 };
+
+const cameraMotion = { bobPhase: 0, bobAmount: 0, lastMoveSpeed: 0 };
+
 
 const audioState = {
   ctx: null,
@@ -1800,6 +1803,155 @@ function addMoodLight(x, y, z, color=0xffd8a8, intensity=0.35, distance=5.5){
   areaGroup.add(p);
   return p;
 }
+
+
+// B49: global visual/immersion pass. Lightweight geometry only, no extra image files.
+function makeVisualMat(color, opacity=1, roughness=1, emissive=0x000000, emissiveIntensity=0){
+  return new THREE.MeshStandardMaterial({ color, roughness, emissive, emissiveIntensity, transparent: opacity < 1, opacity });
+}
+function addVisualBox(x,y,z,w,h,d,mat,ry=0){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z); m.rotation.y = ry;
+  m.castShadow = true; m.receiveShadow = true;
+  areaGroup.add(m);
+  return m;
+}
+function addBaseboards(width, depth, color=0x2d2118){
+  const mat = makeVisualMat(color, 1, 1);
+  addVisualBox(0,0.16,-depth/2+0.05,width,0.18,0.08,mat);
+  addVisualBox(0,0.16, depth/2-0.05,width,0.18,0.08,mat);
+  addVisualBox(-width/2+0.05,0.16,0,0.08,0.18,depth,mat);
+  addVisualBox( width/2-0.05,0.16,0,0.08,0.18,depth,mat);
+}
+function addCeilingBeams(width, depth, count=4, axis='x', color=0x2b2018){
+  const mat = makeVisualMat(color, 1, 0.95);
+  for(let i=0;i<count;i++){
+    const t = (i+1)/(count+1);
+    if(axis === 'x') addVisualBox(0,3.45,-depth/2 + depth*t,width,0.12,0.10,mat);
+    else addVisualBox(-width/2 + width*t,3.45,0,0.10,0.12,depth,mat);
+  }
+}
+function addFloorWear(x,z,w,d,opacity=0.10,color=0x000000,ry=0){
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w,d), new THREE.MeshBasicMaterial({color, transparent:true, opacity, depthWrite:false, side:THREE.DoubleSide}));
+  p.rotation.x = -Math.PI/2; p.rotation.z = ry; p.position.set(x,0.024,z); areaGroup.add(p); return p;
+}
+function addWallDirt(x,y,z,w,h,ry=0,opacity=0.10,color=0x17100c){
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({color, transparent:true, opacity, depthWrite:false, side:THREE.DoubleSide}));
+  p.position.set(x,y,z); p.rotation.y = ry; areaGroup.add(p); return p;
+}
+function addPaperScatter(points){
+  const mat = makeVisualMat(0xd9c9a9, 1, 1);
+  for(const [x,z,ry=0,s=1] of points){
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.36*s,0.018,0.24*s), mat);
+    p.position.set(x,0.035,z); p.rotation.y = ry; p.receiveShadow = true; areaGroup.add(p);
+  }
+}
+function addPropCrate(x,z,s=1,ry=0){
+  const g = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.72*s,0.56*s,0.62*s), materials.darkWood); box.position.y = 0.28*s; g.add(box);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.76*s,0.05*s,0.66*s), materials.brass); band.position.y = 0.58*s; g.add(band);
+  g.position.set(x,0,z); g.rotation.y = ry; g.traverse(m=>{ if(m.isMesh){m.castShadow=m.receiveShadow=true;} }); areaGroup.add(g); return g;
+}
+function addClothBundle(x,z,s=1,color=0x6d5648){
+  const mat = makeVisualMat(color,1,1);
+  const a = new THREE.Mesh(new THREE.SphereGeometry(0.32*s,12,8), mat); a.scale.set(1.25,0.42,0.82); a.position.set(x,0.12*s,z); a.castShadow=a.receiveShadow=true; areaGroup.add(a);
+  return a;
+}
+function addDustMotes(width, depth, count=18){
+  const mat = new THREE.MeshBasicMaterial({color:0xffe4b8, transparent:true, opacity:0.16, depthWrite:false});
+  for(let i=0;i<count;i++){
+    const dot = new THREE.Mesh(new THREE.PlaneGeometry(0.035 + (i%3)*0.012,0.035 + (i%2)*0.012), mat);
+    dot.position.set((Math.random()-0.5)*width, 1.0 + Math.random()*1.8, (Math.random()-0.5)*depth);
+    dot.rotation.y = Math.random()*TAU; areaGroup.add(dot);
+  }
+}
+function addImmersionPass(areaId){
+  const dims = {
+    home:[10,8], lobby:[16,14], kitchen:[11,9], corridor:[24,9.6], room201:[9,9], room202:[9,9], bath:[15,8], archive:[18,14], north:[18,14], detached:[20,14], oldhall:[6.2,24.5], oldwing:[18,18]
+  };
+  const d = dims[areaId];
+  if(!d) return;
+  const [w,dep] = d;
+  addBaseboards(w, dep, areaId.startsWith('old') || areaId==='detached' || areaId==='archive' ? 0x201713 : 0x3a281a);
+  addFloorWear(0,0,Math.max(2.4,w*0.72),Math.max(2.0,dep*0.22), areaId.startsWith('old') ? 0.18 : 0.08, areaId.startsWith('old') ? 0x0b0504 : 0x000000);
+  if(areaId !== 'bath') addCeilingBeams(w, dep, areaId==='corridor' ? 7 : (areaId==='oldhall' ? 8 : 4), areaId==='corridor' || areaId==='oldhall' ? 'x' : 'z', areaId.startsWith('old') ? 0x1a120e : 0x2d2118);
+  if(areaId !== 'home') addDustMotes(w, dep, areaId.startsWith('old') ? 24 : 14);
+
+  if(areaId === 'lobby'){
+    addWallDirt(-7.86,1.55,2.2,5.0,2.1,Math.PI/2,0.10,0x120b07);
+    addWallDirt(7.86,1.45,-0.8,4.6,2.0,-Math.PI/2,0.10,0x120b07);
+    addFloorWear(0,-4.2,8.4,2.6,0.12,0x000000);
+    addVisualBox(-4.9,0.46,-5.6,1.2,0.92,0.42,materials.darkWood,0.08);
+    addVisualBox(-5.2,1.06,-5.62,0.8,0.08,0.48,materials.brass,0.08);
+    addPropCrate(5.7,4.8,0.85,0.2); addClothBundle(6.3,4.35,0.9,0x5c4b43);
+    addMoodLight(0,1.8,5.7,0xffead2,0.18,6.5);
+  }
+  if(areaId === 'corridor'){
+    for(let x=-10;x<=10;x+=4){ addVisualBox(x,1.55,-4.68,0.10,2.95,0.18,materials.darkWood); addVisualBox(x,1.55,4.68,0.10,2.95,0.18,materials.darkWood); }
+    addFloorWear(0,0,22.4,1.25,0.13,0x1a120e);
+    addPaperScatter([[-7.4,3.7,.2,.9],[-2.6,-3.7,-.4,.8],[5.6,3.6,.7,.85],[9.2,-3.7,-.2,.7]]);
+    addMoodLight(-7,1.2,3.9,0xffd8a0,0.18,5.2); addMoodLight(7,1.2,-3.9,0xffd8a0,0.18,5.2);
+  }
+  if(areaId === 'archive'){
+    addWallDirt(0,1.45,6.83,16.5,2.0,Math.PI,0.16,0x0f0b08);
+    addWallDirt(0,1.45,-6.83,16.5,2.0,0,0.13,0x0f0b08);
+    addFloorWear(0,-4.0,16,2.4,0.16,0x0a0705);
+    addPaperScatter([[-7.4,-5.4,.1,1.0],[-4.7,1.8,-.3,.8],[1.5,-5.3,.7,.9],[6.2,1.8,-.6,.7]]);
+    addPropCrate(7.1,-5.2,0.72,-0.3); addClothBundle(-7.4,4.9,0.82,0x3e3530);
+    addMoodLight(-5.8,1.4,-4.6,0xffca92,0.12,4.8); addMoodLight(5.8,1.4,-4.6,0xffca92,0.12,4.8);
+  }
+  if(areaId === 'north'){
+    addFloorWear(0,0,16.0,2.0,0.14,0x0b0806);
+    addWallDirt(0,1.5,-6.82,16.5,2.2,0,0.15,0x100909);
+    addPaperScatter([[-6.4,3.2,.5,.7],[-1.2,-4.6,-.2,.8],[4.7,2.8,.3,.7]]);
+    addPropCrate(-7.0,-2.2,0.7,0.1); addClothBundle(6.4,-3.5,0.8,0x493b34);
+    addMoodLight(0,1.5,0,0xffdab0,0.14,9.0);
+  }
+  if(areaId === 'detached'){
+    addFloorWear(0,0,18.4,2.6,0.18,0x050404);
+    addWallDirt(0,1.5,-6.82,18.8,2.2,0,0.22,0x080606);
+    addPaperScatter([[-8.1,-2.5,.2,.7],[-4.2,3.2,-.6,.8],[1.6,-2.9,.4,.7],[6.2,1.2,-.2,.7]]);
+    addPropCrate(-4.8,-5.8,0.72,-.2); addPropCrate(7.6,3.2,0.62,.5); addClothBundle(2.2,5.8,0.75,0x342b28);
+    addMoodLight(0,1.4,0,0xb8c8e6,0.12,8.0);
+  }
+  if(areaId === 'bath'){
+    addFloorWear(0,0,13.5,2.2,0.09,0x071014);
+    addWallDirt(-7.33,1.45,0,7.2,1.8,Math.PI/2,0.08,0x081316);
+    addMoodLight(0,1.4,0,0xbfe7ff,0.12,8.5);
+    addClothBundle(-5.8,3.4,0.72,0xd7c8a8); addClothBundle(5.4,-3.3,0.7,0xc8b392);
+  }
+  if(areaId === 'oldhall'){
+    addFloorWear(0,0,5.5,22.5,0.20,0x050303);
+    addWallDirt(-2.98,1.55,0,20.5,2.2,Math.PI/2,0.20,0x080303);
+    addWallDirt(2.98,1.55,0,20.5,2.2,-Math.PI/2,0.20,0x080303);
+    for(let z=-9; z<=9; z+=4.5){ addVisualBox(-2.85,1.7,z,0.06,2.1,0.7,makeVisualMat(0x1b2424,0.42,1,0x071010,0.15)); addVisualBox(2.85,1.7,z,0.06,2.1,0.7,makeVisualMat(0x1b2424,0.42,1,0x071010,0.15)); }
+    addMoodLight(-1.9,1.7,-6.5,0x87a8c8,0.18,6.4); addMoodLight(1.9,1.7,5.4,0xff9a6a,0.12,5.0);
+  }
+  if(areaId === 'oldwing'){
+    addFloorWear(0,0,16.6,16.6,0.22,0x050202);
+    addWallDirt(0,1.5,8.96,16.5,2.4,Math.PI,0.24,0x070303);
+    addWallDirt(0,1.5,-8.96,16.5,2.4,0,0.24,0x070303);
+    addPaperScatter([[-6.8,5.9,.2,.7],[-5.6,-3.5,-.6,.8],[2.1,-6.6,.4,.7],[6.6,0.4,-.2,.7]]);
+    addPropCrate(-2.8,6.6,0.8,.2); addPropCrate(6.4,-6.2,0.7,-.4); addClothBundle(5.2,2.3,0.82,0x281c1b);
+    addMoodLight(0,1.5,0,0xff7a55,0.10,9.5);
+  }
+  if(areaId === 'room201' || areaId === 'room202'){
+    addFloorWear(0,0,6.8,2.2,0.08,0x3c2c21);
+    addWallDirt(0,1.4,-4.38,7.8,1.8,0,0.08,0x150f0b);
+    addPaperScatter([[-2.4,2.8,.3,.55],[2.5,-2.8,-.2,.55]]);
+    addMoodLight(0,1.35,-2.2,0xffd8aa,0.12,5.4);
+  }
+}
+function tuneAreaVisibility(areaId){
+  const visibility = {
+    archive:[0.92,0.52,14,52], north:[1.02,0.62,14,58], detached:[0.82,0.44,13,52], oldhall:[0.64,0.34,7,32], oldwing:[0.58,0.32,8,34], corridor:[0.96,0.60,14,42], lobby:[0.80,0.58,11,36], bath:[0.90,0.50,12,34]
+  };
+  const v = visibility[areaId];
+  if(!v) return;
+  hemi.intensity = Math.max(hemi.intensity, v[0]);
+  dirLight.intensity = Math.max(dirLight.intensity, v[1]);
+  if(scene.fog){ scene.fog.near = Math.min(scene.fog.near, v[2]); scene.fog.far = Math.max(scene.fog.far, v[3]); }
+}
 function doorModel(x,z,axis,label,color,opts={}){
   if (opts.style === 'fusuma') return fusumaDoorModel(x, z, axis, label, opts);
   if (opts.style === 'noren') return norenDoorModel(x, z, axis, opts.signText || label, opts);
@@ -2228,7 +2380,9 @@ function buildArea(areaId){
   else if (areaId === 'detached') buildDetached();
   else if (areaId === 'oldhall') buildOldHall();
   else if (areaId === 'oldwing') buildOldWing();
+  applyImmersionPass(areaId);
   applyOldWingCorruption();
+  tuneAreaVisibility(areaId);
 }
 
 
@@ -3873,7 +4027,7 @@ function startDotMiniGame(){
     {name:'STAGE 6', note:'敵が二体。焦らず待つ。', map:['############','#P....#..G.#','#.##E##.##.#','#....#.....#','####.#####.#','#..K.#..D..#','#.####.###.#','#...E..#...#','############']},
     {name:'STAGE 7', note:'視界が狭くなる。', dark:true, map:['############','#P..#....DG#','#.#.#.######','#.#...E...K#','#.#######..#','#......#...#','#.####.#.###','#....E.....#','############']},
     {name:'STAGE 8', note:'鍵を拾ったら下段へ大回り。敵は下段の巡回だけなので、少し待ってから抜ける。', dark:true, map:['############','#P....#..DG#','#.##..#...##','#..K..#....#','####..##.#.#','#........#.#','#.#####.#..#','#..E.....E.#','############']},
-    {name:'STAGE 9', note:'偽の近道に注意。鍵を拾ったら中央の細い抜け道から扉へ。', dark:true, fast:true, map:['############','#P..E#...DG#','#.##.#.#####','#..K.#..T..#','####...#.#.#','#....#...#.#','#.####T#E..#','#......###.#','############']},
+    {name:'STAGE 9', note:'鍵を拾ったら中央へ戻り、敵の巡回を待ってから右上の扉へ。敵は1マス移動に調整済み。', dark:true, fast:false, map:['############','#P...#...DG#','#.##.#.#####','#..K.#..T..#','####...#.#.#','#...E#...#.#','#.####T#...#','#......##E.#','############']},
     {name:'STAGE 10', note:'最後の旧館迷路。', dark:true, fast:true, map:['############','#P..#....DG#','#.#.#.######','#.#K..E...T#','#.#######..#','#..E...#...#','#.####.#.###','#....T..E..#','############']}
   ];
   let stageIndex = 0, grid, px, py, startX, startY, hasKey, enemies, movingLocked = false;
@@ -4511,7 +4665,7 @@ function updateMinimap(){
 function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 
 function setCamera(){
-  camera.position.set(player.x, player.height, player.z);
+  camera.position.set(player.x, player.height + Math.sin(cameraMotion.bobPhase) * cameraMotion.bobAmount, player.z);
   camera.rotation.order = 'YXZ';
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
@@ -4527,14 +4681,25 @@ function movePlayer(dt){
   const moveX = input.joyX + ((input.keys.KeyD?1:0) - (input.keys.KeyA?1:0));
   const moveY = input.joyY + ((input.keys.KeyW?1:0) - (input.keys.KeyS?1:0));
   const len = Math.hypot(moveX, moveY);
-  if (len < 0.01) return;
+  if (len < 0.01) { cameraMotion.bobAmount = lerp(cameraMotion.bobAmount, 0, 0.14); cameraMotion.lastMoveSpeed = 0; return; }
   const nx = moveX / Math.max(1, len);
   const nz = moveY / Math.max(1, len);
-  const speed = player.speed * ((input.keys.ShiftLeft || input.runHeld || input.runToggle) ? player.run : 1) * dt;
+  const isRunning = !!(input.keys.ShiftLeft || input.runHeld || input.runToggle);
+  const speed = player.speed * (isRunning ? player.run : 1) * dt;
   const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
   const dx = (cos * nx - sin * nz) * speed;
   const dz = (-sin * nx - cos * nz) * speed;
+  const bx = player.x, bz = player.z;
   attemptMove(player.x + dx, player.z + dz);
+  const moved = Math.hypot(player.x - bx, player.z - bz);
+  if (moved > 0.0005) {
+    cameraMotion.bobPhase += moved * (isRunning ? 15.5 : 12.0);
+    cameraMotion.bobAmount = lerp(cameraMotion.bobAmount, isRunning ? 0.045 : 0.028, 0.18);
+    cameraMotion.lastMoveSpeed = moved / Math.max(0.001, dt);
+  } else {
+    cameraMotion.bobAmount = lerp(cameraMotion.bobAmount, 0, 0.12);
+    cameraMotion.lastMoveSpeed = 0;
+  }
 }
 function collidesAt(x, z, r){
   for (const c of colliders) {
@@ -4961,7 +5126,7 @@ function onTouchEnd(e){
   if (findTouchByIdentifier(e.changedTouches, input.joyId)) clearJoyInput();
   if (findTouchByIdentifier(e.changedTouches, input.lookId)) clearLookInput();
 }
-function rotateLook(dx,dy){ player.yaw -= dx * 0.0138; player.pitch -= dy * 0.0102; player.pitch = Math.max(-1.05, Math.min(1.05, player.pitch)); }
+function rotateLook(dx,dy){ player.yaw -= dx * 0.0146; player.pitch -= dy * 0.0108; player.pitch = Math.max(-1.05, Math.min(1.05, player.pitch)); }
 function toggleMenu(force){
   if (state.cutscene) return;
   const open = typeof force === 'boolean' ? force : !state.menuOpen;
