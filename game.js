@@ -52,7 +52,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.03;
+renderer.toneMappingExposure = 1.32;
 
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 90);
 const player = { x: 0, z: 0, yaw: 0, pitch: 0, height: 1.62, radius: 0.33, speed: 3.28, run: 1.36 };
@@ -64,9 +64,11 @@ const dynamicGroup = new THREE.Group();
 rootGroup.add(areaGroup);
 rootGroup.add(dynamicGroup);
 
-const hemi = new THREE.HemisphereLight(0xbdd2ff, 0x2f2419, 0.7);
+const hemi = new THREE.HemisphereLight(0xe2ecff, 0x5a4630, 1.12);
 scene.add(hemi);
-const dirLight = new THREE.DirectionalLight(0xfff0da, 0.9);
+const fillAmbient = new THREE.AmbientLight(0xffffff, 0.26);
+scene.add(fillAmbient);
+const dirLight = new THREE.DirectionalLight(0xfff4df, 1.08);
 dirLight.position.set(6, 10, 5);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.width = 1024;
@@ -3870,7 +3872,7 @@ function startDotMiniGame(){
     {name:'STAGE 5', note:'鍵を拾ったら、下の回り道から扉へ。罠床は踏むとやり直し。', map:['############','#P...#..DG.#','#.##.#.#####','#..K.#..E..#','####.###.#.#','#....#...#.#','#.##..T#...#','#........#.#','############']},
     {name:'STAGE 6', note:'敵が二体。焦らず待つ。', map:['############','#P....#..G.#','#.##E##.##.#','#....#.....#','####.#####.#','#..K.#..D..#','#.####.###.#','#...E..#...#','############']},
     {name:'STAGE 7', note:'視界が狭くなる。', dark:true, map:['############','#P..#....DG#','#.#.#.######','#.#...E...K#','#.#######..#','#......#...#','#.####.#.###','#....E.....#','############']},
-    {name:'STAGE 8', note:'敵の動きが速い。', dark:true, fast:true, map:['############','#P...#...DG#','#.##.#E#####','#..K.#.....#','####.###.#.#','#E...#...#.#','#.####.#...#','#......###.#','############']},
+    {name:'STAGE 8', note:'鍵を拾ったら下段へ大回り。敵は下段の巡回だけなので、少し待ってから抜ける。', dark:true, map:['############','#P....#..DG#','#.##..#...##','#..K..#....#','####..##.#.#','#........#.#','#.#####.#..#','#..E.....E.#','############']},
     {name:'STAGE 9', note:'偽の近道に注意。鍵を拾ったら中央の細い抜け道から扉へ。', dark:true, fast:true, map:['############','#P..E#...DG#','#.##.#.#####','#..K.#..T..#','####...#.#.#','#....#...#.#','#.####T#E..#','#......###.#','############']},
     {name:'STAGE 10', note:'最後の旧館迷路。', dark:true, fast:true, map:['############','#P..#....DG#','#.#.#.######','#.#K..E...T#','#.#######..#','#..E...#...#','#.####.#.###','#....T..E..#','############']}
   ];
