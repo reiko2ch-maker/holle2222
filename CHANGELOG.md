@@ -1,9 +1,25 @@
+# B50 Immersion Init Fix
+
+- Fixed startup freeze caused by calling missing `applyImmersionPass()` after the graphics immersion pass.
+- The correct `addImmersionPass(areaId)` function now runs during area build.
+- Kept the B49 graphics / lighting / immersion improvements intact.
+- Updated cache version strings to B50.
+
+# CHANGELOG
+
+## B49 - Graphics / Immersion Pass
+- 全体の露出・環境光・視認性を上げ、暗すぎてプレイに支障が出る箇所を緩和。
+- 帳場、客室廊下、北廊下、宿帳庫、離れ通路、旧館導入廊下、旧館深部にベースボード・天井梁・汚れ・床の擦れ・紙束・小物・補助光を追加。
+- 既存ストーリーやミニゲームの導線は維持しつつ、空間のチープさを減らす環境美術パスを追加。
+- スマホ操作の手触りを微調整し、視点感度と移動速度を少し改善。
+- 歩行時のごく軽いヘッドボブを追加し、没入感を強化。
+
 
 ## B45 - Minigame real fix
 - Fixed 10-stage minigame crash caused by object stage definitions being treated as arrays.
 - Added robust stage parser for object/array map formats.
 - Added safe fallback so the minigame does not freeze on malformed stage data.
-- Updated cache-busting version to b47_stage8_enemy_brightness_fix.
+- Updated cache-busting version to b48_stage9_enemy_fix.
 
 ## B41 Special Route / 10 Stage Mini Game
 - ミニゲームを10ステージ制に拡張。鍵、扉、巡回敵、罠床、視界制限、速度上昇など段階的に難しくなるギミックを追加。

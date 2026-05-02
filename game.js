@@ -2380,7 +2380,7 @@ function buildArea(areaId){
   else if (areaId === 'detached') buildDetached();
   else if (areaId === 'oldhall') buildOldHall();
   else if (areaId === 'oldwing') buildOldWing();
-  applyImmersionPass(areaId);
+  addImmersionPass(areaId);
   applyOldWingCorruption();
   tuneAreaVisibility(areaId);
 }
