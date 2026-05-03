@@ -904,8 +904,8 @@ const storyNodes = {
   ],
   oldWingInnerDoorAfterKey: [
     ['主人公', `血の紙片に書かれていたとおり、鍵がぴたりと合った。`, 'hero'],
-    ['主人公', `扉の向こうから、何人分もの息遣いが聞こえる。`, 'hero'],
-    ['主人公', `ここから先は、あの夜の続きを見ることになる。`, 'hero']
+    ['主人公', `扉の隙間から、古い客たちの忘れ物が床へ転がり出てきた。`, 'hero'],
+    ['主人公', `櫛、写真、薬包。三つを戻せば、この扉の奥へ進める気がする。`, 'hero']
   ],
   ending_release: [
     ['主人公', `櫛、写真、薬包を、奥の扉の前に置いた。`, 'hero'],
@@ -3414,7 +3414,7 @@ function buildOldWing(){
   const innerDoor = new THREE.Mesh(new THREE.BoxGeometry(2.0,2.5,0.18), new THREE.MeshStandardMaterial({ color:0x21171a, roughness:0.9, metalness:0.2 }));
   innerDoor.position.set(0,1.25,-8.96); areaGroup.add(innerDoor);
   addItem('oldWingInnerDoor','旧館奥の扉',0,-8.3,new THREE.Mesh(new THREE.BoxGeometry(1.6,0.1,0.9), new THREE.MeshBasicMaterial({transparent:true, opacity:0.01})), itemInteract);
-  addDoor('oldWingToOldHall','渡り廊下へ戻る',0,8.72,1.3,'oldhall',{x:0,z:-12.9,yaw:0},null,0x5b5961);
+  addDoor('oldWingToOldHall','渡り廊下へ戻る',0,8.72,1.3,'oldhall',{x:0,z:-11.8,yaw:0},null,0x5b5961);
 }
 
 function addHideSpot(id,label,x,z,ry,display){
@@ -3717,9 +3717,10 @@ function itemInteract(entity){
     showDialogue(storyNodes.phone, () => setStep('inspect_archive'));
   } else if (entity.id === 'oldWingDoorLock') {
     playSfx('metal_rattle');
-    if (state.questFlags.hasOldWingKey && (state.step === 'open_old_wing_door' || (state.questFlags.oldWingDoorOpened && state.step === 'cross_old_glass_corridor'))) {
+    if (state.questFlags.hasOldWingKey && (state.step === 'open_old_wing_door' || state.questFlags.oldWingDoorOpened)) {
+      const firstOpen = !state.questFlags.oldWingDoorOpened;
       state.questFlags.oldWingDoorOpened = true;
-      showDialogue(storyNodes.oldWingDoorOpen, () => {
+      const enterOldHall = () => {
         playSfx('door_open');
         state.area = 'oldhall';
         buildArea(state.area);
@@ -3730,8 +3731,11 @@ function itemInteract(entity){
         resetInput();
         state.inputLockUntil = performance.now() + 550;
         state.doorCooldownUntil = performance.now() + 900;
-        setStep('cross_old_glass_corridor');
-      });
+        if (state.step === 'open_old_wing_door') setStep('cross_old_glass_corridor');
+        else saveToSlot(1, true);
+      };
+      if (firstOpen) showDialogue(storyNodes.oldWingDoorOpen, enterOldHall);
+      else showDialogue([['主人公','鉄扉はもう開く。旧館へ戻れる。','hero']], enterOldHall);
     } else if (state.questFlags.hasOldWingKey) {
       showDialogue([['主人公','錆びた鍵が手の中で冷たい。番台裏の鉄扉に合いそうだ。','hero'], ['主人公','旧館へ続く扉だ。入るなら、いまは覚悟を決めてからにしたい。','hero']], ()=>{});
     } else {
@@ -3813,6 +3817,18 @@ function itemInteract(entity){
     state.questFlags.oldWingCorrupted = true;
     spawnOldHallWindowGuide(2.85, -12.6, 1200);
     showDialogue(storyNodes.oldGlassCorridorEnd, () => setStep('inspect_bath_notice'));
+  } else if (entity.id === 'oldHallEndDoor' && (state.questFlags.oldWingDeepRouteStarted || state.step === 'oldwing_search_key' || state.step === 'oldwing_memory_altar' || state.step === 'oldhall_blood_note' || state.step === 'oldwing_key_obtained')) {
+    playSfx('door_open');
+    state.area = 'oldwing';
+    buildArea(state.area);
+    player.x = 0;
+    player.z = 7.25;
+    player.yaw = Math.PI;
+    player.pitch = -0.04;
+    resetInput();
+    state.inputLockUntil = performance.now() + 450;
+    state.doorCooldownUntil = performance.now() + 800;
+    saveToSlot(1, true);
   } else if (entity.id === 'bathNotice' && state.step === 'inspect_bath_notice') {
     playSfx('paper');
     state.questFlags.checkedBathNoticeDay3 = true;
@@ -3867,7 +3883,11 @@ function itemInteract(entity){
         finishEnding('release');
       });
     } else {
-      showDialogue(storyNodes.oldWingInnerDoorAfterKey, () => { saveToSlot(1, true); });
+      showDialogue(storyNodes.oldWingInnerDoorAfterKey, () => {
+        state.questFlags.oldWingRequestsStarted = true;
+        rebuildAreaPreservePlayer();
+        saveToSlot(1, true);
+      });
     }
   } else if (entity.id === 'oldWingRequestNote') {
     playSfx('paper');
